@@ -19,7 +19,7 @@ class TurtleNameManager(Node):
         # Service for getting unique names
         self.name_service = self.create_service(
             Trigger, 
-            'generate_unique_name', 
+            '/turtle_name_manager/generate_unique_name', 
             self.generate_name_callback
         )
         
@@ -34,7 +34,7 @@ class TurtleNameManager(Node):
         Callback for generating unique turtle names
         """
         with self.lock:
-            unique_name = f"turtle_{self.name_counter}"
+            unique_name = f"bot_{self.name_counter}"
             self.name_counter += 1
             
             response.success = True

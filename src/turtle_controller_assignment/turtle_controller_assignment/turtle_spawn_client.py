@@ -20,7 +20,7 @@ class TurtleSpawnClient(Node):
         self.spawn_client = self.create_client(Spawn, 'spawn')
         
         # Client for name manager service
-        self.name_client = self.create_client(Trigger, 'generate_unique_name')
+        self.name_client = self.create_client(Trigger, '/turtle_name_manager/generate_unique_name')
         
         # Wait for services to be available
         self.wait_for_services()

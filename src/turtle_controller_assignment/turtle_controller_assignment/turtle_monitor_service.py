@@ -1,168 +1,101 @@
 #!/usr/bin/env python3
-"""
-Turtle Monitor Service - With Managed/External Turtle Distinction
-"""
-
+import time
 import rclpy
 from rclpy.node import Node
 from std_srvs.srv import Trigger
 from turtlesim.msg import Pose
-import time
-from threading import Lock
+
+CHECK_TIMEOUT = 2.5   # если дольше не было позы — считаем «нет сигнала»
+HARD_REMOVE  = 5.0    # если нет сигнала дольше — считаем удалённой
 
 class TurtleMonitorService(Node):
-    
     def __init__(self):
         super().__init__('turtle_monitor_service')
+
+        # имя -> {'last_pose': t, 'alive': bool}
+        self.turtles = {}
+        self.create_service(Trigger, '/monitor_turtles', self.on_monitor)
+        self.create_timer(1.0, self._health_scan)
+        # Таймер для сканирования топиков и обнаружения новых черепашек
+        self.create_timer(2.0, self._scan_topics)
+
+        # по умолчанию следим за turtle1
+        self._ensure_subscription('turtle1')
+
+        self.get_logger().info('🐢 Turtle Monitor Service started')
+
+    def _ensure_subscription(self, name: str):
+        if name in self.turtles:
+            return
+        self.turtles[name] = {'last_pose': time.time(), 'alive': False}
+        self.create_subscription(Pose, f'/{name}/pose',
+                                 lambda msg, n=name: self._on_pose(n),
+                                 10)
+        self.get_logger().info(f'📡 Now monitoring pose of: {name}')
+
+    def _on_pose(self, name: str):
+        now = time.time()
+        info = self.turtles.get(name)
+        if not info:
+            # новое имя (если появилось внезапно)
+            self._ensure_subscription(name)
+            info = self.turtles[name]
+        info['last_pose'] = now
+        info['alive'] = True
+
+    def _scan_topics(self):
+        """Сканирует топики и добавляет подписки на новые черепашки"""
+        topic_list = self.get_topic_names_and_types()
         
-        self.monitor_service = self.create_service(
-            Trigger, 
-            '/monitor_turtles', 
-            self.monitor_callback
-        )
+        # Собираем список активных черепашек из топиков
+        active_topics = set()
+        for topic_name, _ in topic_list:
+            # Ищем топики вида /<name>/pose
+            if topic_name.endswith('/pose'):
+                # Извлекаем имя черепашки
+                turtle_name = topic_name.split('/')[1]
+                if turtle_name:
+                    active_topics.add(turtle_name)
+                    # Проверяем, что это не уже отслеживаемая черепашка
+                    if turtle_name not in self.turtles:
+                        self._ensure_subscription(turtle_name)
         
-        # Separate tracking for managed vs external turtles
-        self.managed_turtles = {}    # Turtles registered by spawner
-        self.external_turtles = {}   # Turtles detected automatically
-        self.lock = Lock()
-        
-        self.get_logger().info('🐢 Turtle Monitor Service started (managed/external distinction)')
-    
-    def register_managed_turtle(self, turtle_name):
-        """Register a turtle as managed by spawner"""
-        with self.lock:
-            if turtle_name not in self.managed_turtles:
-                self.managed_turtles[turtle_name] = self.create_turtle_data()
-                self.create_pose_subscription(turtle_name)
-                self.get_logger().info(f'📡 Monitoring MANAGED turtle: {turtle_name}')
-                return True
-            return False
-    
-    def create_turtle_data(self):
-        """Create tracking data structure for a turtle"""
-        return {
-            'current_pose': False,
-            'previous_pose': False, 
-            'last_update': time.time(),
-            'removed': False
-        }
-    
-    def create_pose_subscription(self, turtle_name):
-        """Create pose subscription for a turtle"""
-        def pose_callback(msg):
-            self.update_turtle_pose(turtle_name)
-        
-        self.create_subscription(
-            Pose,
-            f'/{turtle_name}/pose',
-            pose_callback,
-            10
-        )
-    
-    def update_turtle_pose(self, turtle_name):
-        """Update turtle pose status"""
-        with self.lock:
-            # Check both managed and external
-            if turtle_name in self.managed_turtles:
-                data = self.managed_turtles[turtle_name]
-                data['previous_pose'] = data['current_pose']
-                data['current_pose'] = True
-                data['last_update'] = time.time()
-                data['removed'] = False
-            
-            if turtle_name in self.external_turtles:
-                data = self.external_turtles[turtle_name]
-                data['previous_pose'] = data['current_pose']
-                data['current_pose'] = True
-                data['last_update'] = time.time()
-                data['removed'] = False
-    
-    def auto_detect_external_turtles(self):
-        """Automatically detect external turtles by checking pose topics"""
-        # This is simplified - in real implementation you'd check available topics
-        # For now, we rely on pose callbacks to auto-detect
-        pass
-    
-    def check_turtle_health(self):
-        """Check health of all turtles with double verification"""
-        with self.lock:
-            current_time = time.time()
-            removed_managed = []
-            removed_external = []
-            
-            # Check managed turtles
-            for turtle_name, data in self.managed_turtles.items():
-                if current_time - data['last_update'] > 3.0:
-                    data['previous_pose'] = data['current_pose']
-                    data['current_pose'] = False
-                
-                # Double-check removal
-                if not data['current_pose'] and not data['previous_pose'] and not data['removed']:
-                    data['removed'] = True
-                    removed_managed.append(turtle_name)
-            
-            # Check external turtles
-            for turtle_name, data in self.external_turtles.items():
-                if current_time - data['last_update'] > 3.0:
-                    data['previous_pose'] = data['current_pose']
-                    data['current_pose'] = False
-                
-                if not data['current_pose'] and not data['previous_pose'] and not data['removed']:
-                    data['removed'] = True
-                    removed_external.append(turtle_name)
-            
-            return removed_managed, removed_external
-    
-    def get_monitoring_status(self):
-        """Get current monitoring status"""
-        with self.lock:
-            status = {
-                'managed_count': len(self.managed_turtles),
-                'external_count': len(self.external_turtles),
-                'managed_active': len([t for t, d in self.managed_turtles.items() if d['current_pose']]),
-                'external_active': len([t for t, d in self.external_turtles.items() if d['current_pose']]),
-                'managed_removed': len([t for t, d in self.managed_turtles.items() if d['removed']]),
-                'external_removed': len([t for t, d in self.external_turtles.items() if d['removed']])
-            }
-            return status
-    
-    def monitor_callback(self, request, response):
-        """Service callback for monitoring"""
-        try:
-            # Check health
-            removed_managed, removed_external = self.check_turtle_health()
-            
-            # Get status
-            status = self.get_monitoring_status()
-            
-            # Prepare response
-            if removed_managed:
-                response.success = True
-                response.message = f"MANAGED_REMOVED:{','.join(removed_managed)}"
-                for turtle_name in removed_managed:
-                    self.get_logger().warning(f'🚨 MANAGED turtle removed: {turtle_name}')
-                
-            elif removed_external:
-                response.success = True
-                response.message = f"EXTERNAL_REMOVED:{','.join(removed_external)}"
-                for turtle_name in removed_external:
-                    self.get_logger().info(f'ℹ️  EXTERNAL turtle removed: {turtle_name}')
-                    
-            else:
-                response.success = True
-                response.message = f"OK: {status['managed_active']}/{status['managed_count']} managed active, {status['external_active']} external"
-            
-        except Exception as e:
-            response.success = False
-            response.message = f"ERROR:{str(e)}"
-        
+        # Удаляем из отслеживания черепашек, топики которых исчезли
+        for turtle_name in list(self.turtles.keys()):
+            if turtle_name not in active_topics:
+                if self.turtles[turtle_name]['alive']:
+                    self.get_logger().warning(f'🗑️  Topic disappeared, removing turtle from tracking: {turtle_name}')
+                # Полностью удаляем из отслеживания
+                del self.turtles[turtle_name]
+
+    def _health_scan(self):
+        now = time.time()
+        for name, info in list(self.turtles.items()):
+            dt = now - info['last_pose']
+            if dt > HARD_REMOVE:
+                # считаем удалённой (не приходила поза очень давно)
+                if info['alive']:
+                    self.get_logger().warning(f'⚠️  Turtle appears removed: {name}')
+                info['alive'] = False
+            elif dt > CHECK_TIMEOUT:
+                # временно «нет сигнала», но окончательно не удаляем
+                info['alive'] = False
+
+    def on_monitor(self, request, response):
+        # ЗДЕСЬ не сканируем топики — монитор только «отвечает» текущим статусом.
+        alive = [n for n, d in self.turtles.items() if d['alive']]
+        removed = [n for n, d in self.turtles.items() if not d['alive']]
+
+        # строка вида: "ACTIVE:a,b;REMOVED:x,y"
+        response.success = True
+        response.message = f"ACTIVE:{','.join(alive)};REMOVED:{','.join(removed)}"
         return response
 
-def main(args=None):
-    rclpy.init(args=args)
-    monitor = TurtleMonitorService()
-    rclpy.spin(monitor)
-    monitor.destroy_node()
+def main():
+    rclpy.init()
+    node = TurtleMonitorService()
+    rclpy.spin(node)
+    node.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':
