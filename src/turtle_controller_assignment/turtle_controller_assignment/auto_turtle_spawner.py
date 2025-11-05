@@ -15,6 +15,7 @@ import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.publisher import Publisher
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 
@@ -49,9 +50,9 @@ class AutoTurtleSpawner(Node):
                 self.get_logger().info(f'Waiting for service: {path}')
 
         # --- локальные структуры ---
-        self.max_additional = 10                  # лимит ДОПОЛНИТЕЛЬНЫХ
+        self.max_turtles = 10                     # лимит ВСЕХ черепашек (включая turtle1)
         self.my_turtles: set[str] = set()         # имена наших дополнительных
-        self.cmd_pubs: dict[str, rclpy.publisher.Publisher] = {}   # name -> /<name>/cmd_vel
+        self.cmd_pubs: dict[str, Publisher] = {}   # name -> /<name>/cmd_vel
         self.omega: dict[str, float] = {}         # name -> угловая скорость
         if MOVE_TURTLE1:
             self.turtle1_pub = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
@@ -122,15 +123,15 @@ class AutoTurtleSpawner(Node):
                 self.get_logger().warn(f'Cleanup removed turtle reported by monitor: {name}')
                 self._cleanup(name)
 
-        # считаем количество дополнительных по данным монитора
-        active_additional = len([n for n in active if n != 'turtle1'])
-        self.get_logger().info(f'📊 Active additional turtles: {active_additional}/{self.max_additional}')
+        # считаем общее количество всех черепашек по данным монитора
+        total_active = len(active)
+        self.get_logger().info(f'📊 Total active turtles: {total_active}/{self.max_turtles}')
         
-        if active_additional < self.max_additional:
+        if total_active < self.max_turtles:
             self.get_logger().info(f'🚀 Attempting to spawn new turtle...')
             self._spawn_one()
         else:
-            self.get_logger().info(f'✋ Max turtles reached ({self.max_additional}), not spawning')
+            self.get_logger().info(f'✋ Max turtles reached ({self.max_turtles}), not spawning')
 
     def _spawn_one(self):
         name = self._get_unique_name()
