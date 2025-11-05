@@ -3,10 +3,12 @@
 """
 Task 3: Auto Turtle Spawner
 
-- Имена: только у /turtle_name_manager/generate_unique_name (std_srvs/Trigger)
-- Активные/удалённые: только из /monitor_turtles (std_srvs/Trigger)
-  Формат строки: "ACTIVE:a,b;REMOVED:x,y"
-- Спавн до 10 ДОПОЛНИТЕЛЬНЫХ (кроме turtle1); pen OFF; движение по кругу.
+- Spawns a turtle at random coordinates every 5 seconds
+- Sets it moving on a circular path with pen turned off
+- Ensures at most 10 additionally spawned turtles (excluding turtle1)
+- Coordinates formula: r~U(1,5), φ~U(0,2π), x'~U(-5.5+r,5.5-r), y'~U(-5.5+r,5.5-r)
+  x = 5.5 + x' + r*cos(φ), y = 5.5 + y' + r*sin(φ), θ = φ ± π/2
+- Velocities: vx = 1.0, ωz = ±1/r
 """
 
 import math
@@ -50,7 +52,7 @@ class AutoTurtleSpawner(Node):
                 self.get_logger().info(f'Waiting for service: {path}')
 
         # --- локальные структуры ---
-        self.max_turtles = 10                     # лимит ВСЕХ черепашек (включая turtle1)
+        self.max_additional = 10                  # лимит ДОПОЛНИТЕЛЬНЫХ черепашек (кроме turtle1)
         self.my_turtles: set[str] = set()         # имена наших дополнительных
         self.cmd_pubs: dict[str, Publisher] = {}   # name -> /<name>/cmd_vel
         self.omega: dict[str, float] = {}         # name -> угловая скорость
@@ -58,7 +60,7 @@ class AutoTurtleSpawner(Node):
             self.turtle1_pub = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
 
         # --- таймеры ---
-        self.manage_timer = self.create_timer(2.0, self._manage, callback_group=self.timer_cb_group)   # решение о спавне
+        self.spawn_timer = self.create_timer(5.0, self._try_spawn, callback_group=self.timer_cb_group)  # спавн каждые 5 секунд
         self.move_timer   = self.create_timer(0.1, self._move_all, callback_group=self.timer_cb_group) # движение
         self._tick = 0  # для редкого логирования из таймера движения
 
@@ -112,7 +114,8 @@ class AutoTurtleSpawner(Node):
         return active, removed
 
     # ---------- основная логика ----------
-    def _manage(self):
+    def _try_spawn(self):
+        """Вызывается каждые 5 секунд для попытки создать новую черепашку"""
         active, removed = self._ask_monitor()
         
         self.get_logger().info(f'🔍 Monitor status - ACTIVE: {active}, REMOVED: {removed}')
@@ -123,15 +126,15 @@ class AutoTurtleSpawner(Node):
                 self.get_logger().warn(f'Cleanup removed turtle reported by monitor: {name}')
                 self._cleanup(name)
 
-        # считаем общее количество всех черепашек по данным монитора
-        total_active = len(active)
-        self.get_logger().info(f'📊 Total active turtles: {total_active}/{self.max_turtles}')
+        # считаем количество дополнительных черепашек (исключая turtle1)
+        additional_active = len([n for n in active if n != 'turtle1'])
+        self.get_logger().info(f'📊 Additional turtles: {additional_active}/{self.max_additional} (total: {len(active)})')
         
-        if total_active < self.max_turtles:
-            self.get_logger().info(f'🚀 Attempting to spawn new turtle...')
+        if additional_active < self.max_additional:
+            self.get_logger().info(f'🚀 Spawning new turtle...')
             self._spawn_one()
         else:
-            self.get_logger().info(f'✋ Max turtles reached ({self.max_turtles}), not spawning')
+            self.get_logger().info(f'✋ Max additional turtles reached ({self.max_additional}), not spawning')
 
     def _spawn_one(self):
         name = self._get_unique_name()
@@ -141,16 +144,22 @@ class AutoTurtleSpawner(Node):
         
         self.get_logger().info(f'📝 Got unique name from manager: {name}')
 
-        # случайные безопасные параметры
-        r = random.uniform(1.0, 4.0)
-        phi = random.uniform(0.0, 2 * math.pi)
-        cx = random.uniform(1.5, 9.5)
-        cy = random.uniform(1.5, 9.5)
-        x = max(0.5, min(10.5, cx + r * math.cos(phi)))
-        y = max(0.5, min(10.5, cy + r * math.sin(phi)))
-
+        # Генерация координат по формуле из задания
+        # r ~ U(1, 5)
+        r = random.uniform(1.0, 5.0)
+        # φ ~ U(0, 2π)
+        phi = random.uniform(0.0, 2.0 * math.pi)
+        # x' ~ U(-5.5+r, 5.5-r)
+        x_prime = random.uniform(-5.5 + r, 5.5 - r)
+        # y' ~ U(-5.5+r, 5.5-r)
+        y_prime = random.uniform(-5.5 + r, 5.5 - r)
+        # x = 5.5 + x' + r*cos(φ)
+        x = 5.5 + x_prime + r * math.cos(phi)
+        # y = 5.5 + y' + r*sin(φ)
+        y = 5.5 + y_prime + r * math.sin(phi)
+        # θ = φ ± π/2 (случайный выбор знака)
         direction = random.choice([-1.0, 1.0])
-        theta = (phi + direction * math.pi / 2.0) % (2 * math.pi)
+        theta = phi + direction * math.pi / 2.0
 
         # вызов /spawn
         if not self.cli_spawn.service_is_ready():

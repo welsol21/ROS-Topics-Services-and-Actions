@@ -68,3 +68,9 @@ ENV/
 
 # Documentation
 docs/_build/
+
+# Assignment files
+COMP9069_Assign1_2025.pdf
+Разбор assignment1.docx
+*.pdf
+*.docx
