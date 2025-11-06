@@ -25,6 +25,8 @@ setup(
             'pen_control_client = turtle_controller_assignment.pen_control_client:main',
             'auto_turtle_spawner = turtle_controller_assignment.auto_turtle_spawner:main',
             'turtle_monitor_service = turtle_controller_assignment.turtle_monitor_service:main',
+            'closest_turtle_service = turtle_controller_assignment.closest_turtle_service:main',
+            'closest_turtle_client = turtle_controller_assignment.closest_turtle_client:main',
         ],
     },
 )

@@ -19,7 +19,9 @@ turtle_controller_assignment/
     ├── turtle_name_manager.py       # Name Management Service
     ├── pen_control_client.py        # Task 2
     ├── auto_turtle_spawner.py       # Task 3
-    └── turtle_monitor_service.py    # Monitoring Service
+    ├── turtle_monitor_service.py    # Monitoring Service
+    ├── closest_turtle_service.py    # Task 4 - Service Server
+    └── closest_turtle_client.py     # Task 4 - Test Client
 ```
 
 ---
@@ -122,8 +124,55 @@ turtle_controller_assignment/
 - **Status:** COMPLETED AND TESTED
 
 ### Task 4: Closest Turtle Service Server [15%]
-- **Status:** Not implemented
-- **Node Name:** `closest_turtle_server`
+- **Node Name:** `closest_turtle_service`
+- **File:** `closest_turtle_service.py`
+- **Functionality:** Service server that determines the closest turtle to turtle1
+- **Service:** `/find_closest_turtle` (custom_interfaces/srv/FindClosestTurtle)
+- **Key Features:**
+  - Dynamically discovers and tracks all turtles by scanning pose topics
+  - Subscribes to pose updates from all detected turtles
+  - Calculates Euclidean distance from turtle1 to all other turtles
+  - Returns closest turtle name and distance when service is called
+  - Automatically removes disappeared turtles from tracking
+- **Custom Service Definition:**
+  ```
+  # Request: empty (just trigger)
+  ---
+  # Response:
+  string closest_turtle_name
+  float64 distance
+  bool success
+  string message
+  ```
+- **Algorithm:**
+  - Distance calculation: `d = sqrt((x2-x1)² + (y2-y1)²)`
+  - Compares all active turtles (excluding turtle1)
+  - Returns turtle with minimum distance
+- **Test Client:** `closest_turtle_client` (calls service every 3 seconds)
+- **Usage:**
+  ```bash
+  # Terminal 1 - turtlesim
+  ros2 run turtlesim turtlesim_node
+  
+  # Terminal 2 - name manager
+  ros2 run turtle_controller_assignment turtle_name_manager
+  
+  # Terminal 3 - monitor service
+  ros2 run turtle_controller_assignment turtle_monitor_service
+  
+  # Terminal 4 - auto spawner (to create turtles)
+  ros2 run turtle_controller_assignment auto_turtle_spawner
+  
+  # Terminal 5 - closest turtle service
+  ros2 run turtle_controller_assignment closest_turtle_service
+  
+  # Terminal 6 - test client (optional)
+  ros2 run turtle_controller_assignment closest_turtle_client
+  
+  # Or call manually:
+  ros2 service call /find_closest_turtle custom_interfaces/srv/FindClosestTurtle
+  ```
+- **Status:** COMPLETED AND TESTED
 
 ### Task 5: Turtle Collection Action Server [25%]
 - **Status:** Not implemented
@@ -161,6 +210,7 @@ turtle_1, turtle_2, turtle_3...
 - Task 1 completed with unique name generation  
 - Task 2 completed - Pen Control Client implemented and tested  
 - Task 3 completed - Auto Turtle Spawner with monitoring system  
+- Task 4 completed - Closest Turtle Service Server implemented and tested  
 - Remaining tasks pending implementation  
 
 ---
@@ -221,11 +271,11 @@ ros2 run turtle_controller_assignment pen_control_client
 1. ~~Implement Task 1 with name management~~  
 2. ~~Implement Task 2 (pen control client)~~  
 3. ~~Implement Task 3 (auto-spawner with monitoring system)~~  
-4. Implement Task 4 (closest turtle service)  
+4. ~~Implement Task 4 (closest turtle service)~~  
 5. Implement Task 5 (collection action server)  
 6. Implement Task 6 (action client with cancellation)  
 7. Create Task 7 (comprehensive launch file)
 
 ---
 
-*Last updated: Task 3 completed — Auto Turtle Spawner with monitoring system implemented and tested*
+*Last updated: Task 4 completed — Closest Turtle Service Server implemented and tested*

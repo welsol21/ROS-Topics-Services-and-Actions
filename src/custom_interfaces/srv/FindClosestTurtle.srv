@@ -1,0 +1,7 @@
+# Request: empty (just trigger the service)
+---
+# Response: name of the closest turtle and distance
+string closest_turtle_name
+float64 distance
+bool success
+string message

@@ -15,6 +15,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Time.msg"
   "msg/Sphere.msg"
   "srv/CircleDuration.srv"
+  "srv/FindClosestTurtle.srv"
   "action/MoveTurtle.action"
   DEPENDENCIES geometry_msgs builtin_interfaces
 )
