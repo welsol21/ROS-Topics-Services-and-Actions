@@ -25,8 +25,8 @@ from std_srvs.srv import Trigger
 from turtlesim.srv import Spawn, SetPen
 from geometry_msgs.msg import Twist
 
-# двигать ли также и turtle1
-MOVE_TURTLE1 = True
+# двигать ли также и turtle1 (DISABLED to avoid conflict with action server)
+MOVE_TURTLE1 = False
 
 
 class AutoTurtleSpawner(Node):
@@ -36,11 +36,28 @@ class AutoTurtleSpawner(Node):
         # Callback groups для избежания deadlock
         self.timer_cb_group = MutuallyExclusiveCallbackGroup()
         self.client_cb_group = MutuallyExclusiveCallbackGroup()
+        
+        # Flag to enable/disable spawning (for collection action)
+        self.spawning_enabled = True
 
         # --- клиенты сервисов ---
         self.cli_name    = self.create_client(Trigger, '/turtle_name_manager/generate_unique_name', callback_group=self.client_cb_group)
         self.cli_monitor = self.create_client(Trigger, '/monitor_turtles', callback_group=self.client_cb_group)
         self.cli_spawn   = self.create_client(Spawn,   '/spawn', callback_group=self.client_cb_group)
+        
+        # Service to enable/disable spawning
+        self.enable_service = self.create_service(
+            Trigger,
+            '/spawner/enable',
+            self.enable_callback,
+            callback_group=self.client_cb_group
+        )
+        self.disable_service = self.create_service(
+            Trigger,
+            '/spawner/disable',
+            self.disable_callback,
+            callback_group=self.client_cb_group
+        )
 
         # дождёмся сервисов
         for cli, path in [
@@ -65,6 +82,22 @@ class AutoTurtleSpawner(Node):
         self._tick = 0  # для редкого логирования из таймера движения
 
         self.get_logger().info('🧩 AutoTurtleSpawner started')
+    
+    def enable_callback(self, request, response):
+        """Enable spawning and movement"""
+        self.spawning_enabled = True
+        response.success = True
+        response.message = 'Auto spawner enabled'
+        self.get_logger().info('✅ Auto spawner enabled')
+        return response
+    
+    def disable_callback(self, request, response):
+        """Disable spawning and movement"""
+        self.spawning_enabled = False
+        response.success = True
+        response.message = 'Auto spawner disabled'
+        self.get_logger().info('⏸️  Auto spawner disabled')
+        return response
 
     # ---------- утилиты вызова Trigger ----------
     def _call_trigger(self, client, timeout_sec=2.0) -> str:
@@ -116,6 +149,10 @@ class AutoTurtleSpawner(Node):
     # ---------- основная логика ----------
     def _try_spawn(self):
         """Вызывается каждые 5 секунд для попытки создать новую черепашку"""
+        # Skip if spawning is disabled
+        if not self.spawning_enabled:
+            return
+        
         active, removed = self._ask_monitor()
         
         self.get_logger().info(f'🔍 Monitor status - ACTIVE: {active}, REMOVED: {removed}')
@@ -215,6 +252,10 @@ class AutoTurtleSpawner(Node):
             pass
 
     def _move_all(self):
+        # Don't move turtles if spawner is disabled
+        if not self.spawning_enabled:
+            return
+        
         moved = 0
         # двигаем наших дополнительных
         for name, pub in list(self.cmd_pubs.items()):
