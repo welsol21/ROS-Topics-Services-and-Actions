@@ -28,6 +28,7 @@ setup(
             'closest_turtle_service = turtle_controller_assignment.closest_turtle_service:main',
             'closest_turtle_client = turtle_controller_assignment.closest_turtle_client:main',
             'turtle_collection_server = turtle_controller_assignment.turtle_collection_server:main',
+            'turtle_collection_client = turtle_controller_assignment.turtle_collection_client:main',
         ],
     },
 )

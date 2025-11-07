@@ -35,9 +35,9 @@ class TurtleCollectionServer(Node):
         self.turtle_poses = {}
         self.max_turtles = 11
         
-        # Control gains (increased linear for better pursuit of moving targets)
-        self.linear_gain = 5.0
-        self.angular_gain = 6.0
+        # Control gains as specified in assignment
+        self.linear_gain = 2.0
+        self.angular_gain = 4.0
         self.collection_distance = 0.5
         
         # Publishers and subscribers

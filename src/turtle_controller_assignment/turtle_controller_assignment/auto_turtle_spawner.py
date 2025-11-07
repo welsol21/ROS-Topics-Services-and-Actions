@@ -252,10 +252,6 @@ class AutoTurtleSpawner(Node):
             pass
 
     def _move_all(self):
-        # Don't move turtles if spawner is disabled
-        if not self.spawning_enabled:
-            return
-        
         moved = 0
         # двигаем наших дополнительных
         for name, pub in list(self.cmd_pubs.items()):
