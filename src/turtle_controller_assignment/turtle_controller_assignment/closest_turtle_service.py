@@ -50,20 +50,24 @@ class ClosestTurtleService(Node):
         """Scan for new turtle pose topics and subscribe to them"""
         topic_list = self.get_topic_names_and_types()
         
-        # Find all turtle pose topics
+        # Find all turtle pose topics with active publishers
         active_topics = set()
         for topic_name, topic_types in topic_list:
             if topic_name.endswith('/pose') and 'turtlesim/msg/Pose' in topic_types:
-                # Extract turtle name from topic like /turtle1/pose
-                parts = topic_name.split('/')
-                if len(parts) >= 2:
-                    turtle_name = parts[1]
-                    if turtle_name:
-                        active_topics.add(turtle_name)
-                        if turtle_name not in self.turtle_poses:
-                            self._ensure_subscription(turtle_name)
+                # Check if this topic has any publishers
+                publisher_count = self.count_publishers(topic_name)
+                
+                if publisher_count > 0:
+                    # Extract turtle name from topic like /turtle1/pose
+                    parts = topic_name.split('/')
+                    if len(parts) >= 2:
+                        turtle_name = parts[1]
+                        if turtle_name:
+                            active_topics.add(turtle_name)
+                            if turtle_name not in self.turtle_poses:
+                                self._ensure_subscription(turtle_name)
         
-        # Remove turtles that no longer exist
+        # Remove turtles that no longer exist or have no publishers
         for turtle_name in list(self.turtle_poses.keys()):
             if turtle_name not in active_topics:
                 self.get_logger().info(f'🗑️  Removing disappeared turtle: {turtle_name}')
@@ -71,6 +75,9 @@ class ClosestTurtleService(Node):
     
     def on_find_closest(self, request, response):
         """Service callback to find the closest turtle to turtle1"""
+        
+        # Scan topics on-demand to ensure fresh state
+        self._scan_topics()
         
         # Check if turtle1 exists and has pose data
         if 'turtle1' not in self.turtle_poses or self.turtle_poses['turtle1'] is None:
