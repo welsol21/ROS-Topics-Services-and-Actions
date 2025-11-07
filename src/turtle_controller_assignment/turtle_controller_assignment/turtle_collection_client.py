@@ -10,6 +10,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from custom_interfaces.action import MoveTurtle
+from std_srvs.srv import Trigger
 
 
 class TurtleCollectionClient(Node):
@@ -23,6 +24,11 @@ class TurtleCollectionClient(Node):
             'collect_turtles'
         )
         
+        self.collection_in_progress = False
+        
+        # Create client for monitor service to get accurate turtle count
+        self.monitor_client = self.create_client(Trigger, '/monitor_turtles')
+        
         self.get_logger().info('🎯 Turtle Collection Action Client started')
         self.get_logger().info('   Waiting for action server...')
         
@@ -32,44 +38,48 @@ class TurtleCollectionClient(Node):
             return
         
         self.get_logger().info('   ✅ Action server available')
-        self.get_logger().info('   Waiting for turtles to spawn...')
         
-        # Wait for at least 10 turtles (1 turtle1 + 10 bots)
-        self.wait_for_turtles(min_turtles=10)
-        
-        # Send goal
-        self.send_goal()
+        # Create timer to monitor turtle count every second
+        self.create_timer(1.0, self.check_turtle_count)
     
-    def wait_for_turtles(self, min_turtles=10, timeout_sec=120.0):
-        """Wait until at least min_turtles are present in the simulation"""
-        import time
-        start_time = time.time()
+    def check_turtle_count(self):
+        """Periodically check turtle count and start collection when 10 bots present"""
+        # Skip if collection already in progress
+        if self.collection_in_progress:
+            return
         
-        while True:
-            # Count pose topics (excluding turtle1)
-            topic_list = self.get_topic_names_and_types()
-            bot_count = 0
-            
-            for topic_name, topic_types in topic_list:
-                if topic_name.endswith('/pose') and 'turtlesim/msg/Pose' in topic_types:
-                    parts = topic_name.split('/')
-                    if len(parts) >= 2:
-                        turtle_name = parts[1]
-                        if turtle_name and turtle_name != 'turtle1':
-                            bot_count += 1
-            
-            if bot_count >= min_turtles:
-                self.get_logger().info(f'   ✅ Found {bot_count} bots, ready to start collection')
-                return
-            
-            if time.time() - start_time > timeout_sec:
-                self.get_logger().warning(f'⚠️  Timeout waiting for turtles (found {bot_count})')
-                return
-            
-            time.sleep(1.0)
+        # Use monitor service to get accurate count of active turtles
+        if not self.monitor_client.service_is_ready():
+            return
+        
+        request = Trigger.Request()
+        future = self.monitor_client.call_async(request)
+        future.add_done_callback(self._handle_monitor_response)
+    
+    def _handle_monitor_response(self, future):
+        """Handle response from monitor service"""
+        try:
+            response = future.result()
+            if response.success:
+                # Parse message: "ACTIVE:turtle1,bot_1,bot_2;REMOVED:"
+                parts = response.message.split(';')
+                active_part = parts[0].replace('ACTIVE:', '')
+                active_turtles = [t.strip() for t in active_part.split(',') if t.strip()]
+                
+                # Count bots (excluding turtle1)
+                bot_count = sum(1 for t in active_turtles if t != 'turtle1')
+                
+                # Start collection when 10 or more bots present
+                if bot_count >= 10:
+                    self.get_logger().info(f'✅ Found {bot_count} active bots, starting collection...')
+                    self.send_goal()
+        except Exception as e:
+            self.get_logger().error(f'Error checking turtle count: {e}')
     
     def send_goal(self):
         """Send goal to collect all turtles"""
+        self.collection_in_progress = True
+        
         goal_msg = MoveTurtle.Goal()
         # MoveTurtle.Goal has x and y fields, but we don't use them for collection
         goal_msg.x = 0.0
@@ -111,8 +121,9 @@ class TurtleCollectionClient(Node):
         else:
             self.get_logger().error('❌ Collection failed')
         
-        # Shutdown after completion
-        rclpy.shutdown()
+        # Mark collection as complete, ready for next cycle
+        self.collection_in_progress = False
+        self.get_logger().info('⏳ Waiting for next batch of 10 bots...')
 
 
 def main():
