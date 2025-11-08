@@ -41,6 +41,10 @@ class TurtleCollectionClient(Node):
         
         # Create timer to monitor turtle count every second
         self.create_timer(1.0, self.check_turtle_count)
+        # Timer to check cancellation condition during an active goal
+        self.create_timer(1.0, self.check_cancel_condition)
+        # Store goal handle for cancellation (минимально, строго под требование отмены)
+        self.goal_handle = None
     
     def check_turtle_count(self):
         """Periodically check turtle count and start collection when 10 bots present"""
@@ -70,8 +74,8 @@ class TurtleCollectionClient(Node):
                 bot_count = sum(1 for t in active_turtles if t != 'turtle1')
                 
                 # Start collection when 10 or more bots present
-                if bot_count >= 10:
-                    self.get_logger().info(f'✅ Found {bot_count} active bots, starting collection...')
+                if bot_count >= 1:
+                    self.get_logger().info(f'Starting collection with {bot_count} active bots...')
                     self.send_goal()
         except Exception as e:
             self.get_logger().error(f'Error checking turtle count: {e}')
@@ -93,6 +97,29 @@ class TurtleCollectionClient(Node):
         )
         send_goal_future.add_done_callback(self.goal_response_callback)
     
+    def check_cancel_condition(self):
+        """Cancel goal if bots >= 10 during collection"""
+        if not self.collection_in_progress or not self.monitor_client.service_is_ready():
+            return
+        request = Trigger.Request()
+        future = self.monitor_client.call_async(request)
+        def _cancel_if_needed(fut):
+            try:
+                response = fut.result()
+                if response and response.success:
+                    parts = response.message.split(';')
+                    active_part = parts[0].replace('ACTIVE:', '')
+                    active_turtles = [t.strip() for t in active_part.split(',') if t.strip()]
+                    bot_count = sum(1 for t in active_turtles if t != 'turtle1')
+                    # Log current bots left to collect (for clarity, e.g., 9)
+                    self.get_logger().info(f'Bots left to collect: {bot_count}')
+                    if bot_count >= 10 and self.goal_handle:
+                        self.get_logger().info(f'Canceling goal: active bots={bot_count} (>=10)')
+                        self.goal_handle.cancel_goal_async()
+            except Exception as e:
+                self.get_logger().error(f'Error checking cancel condition: {e}')
+        future.add_done_callback(_cancel_if_needed)
+    
     def goal_response_callback(self, future):
         """Handle goal acceptance/rejection"""
         goal_handle = future.result()
@@ -102,7 +129,8 @@ class TurtleCollectionClient(Node):
             return
         
         self.get_logger().info('✅ Goal accepted by server')
-        
+        # Store handle for cancellation (required to meet cancel rule)
+        self.goal_handle = goal_handle
         # Wait for result
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self.result_callback)
@@ -123,7 +151,8 @@ class TurtleCollectionClient(Node):
         
         # Mark collection as complete, ready for next cycle
         self.collection_in_progress = False
-        self.get_logger().info('⏳ Waiting for next batch of 10 bots...')
+        self.goal_handle = None
+        self.get_logger().info('⏳ Ready for next collection')
 
 
 def main():

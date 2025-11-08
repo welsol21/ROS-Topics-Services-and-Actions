@@ -223,8 +223,21 @@ turtle_controller_assignment/
   ```
 
 ### Task 6: Action Client [10%]
-- **Status:** Not implemented
+- **Status:** Implemented
 - **Node Name:** `turtle_collection_client`
+- **Functionality:** Action client for `collect_turtles` (`custom_interfaces/action/MoveTurtle`). Starts collection when there is at least 1 active bot, prints feedback (distance to target), and enforces the cancellation rule.
+- **Key Features:**
+  - Displays action feedback: remaining distance to the current target.
+  - Starts collection when bot count ≥ 1.
+  - Real-time cancellation rule: cancels the current goal if bots left to collect ≥ 10 at any time during the action.
+  - After cancel: logs failure, server resets simulation, client becomes ready for the next collection.
+- **Verification of real-time cancellation:**
+  - For testing only, we temporarily kept the spawner enabled during the goal and accelerated the spawn interval to 0.5s. This allowed bots to exceed the threshold during an active goal. The client then logged: `Bots left to collect: 10` and `Canceling goal: active bots=10 (>=10)`, followed by `❌ Collection failed`.
+  - The temporary test changes have been reverted: server again disables the spawner at goal start, and the spawner interval is 5 seconds per assignment.
+- **Usage:**
+  ```bash
+  ros2 run turtle_controller_assignment turtle_collection_client
+  ```
 
 ### Task 7: Launch File [5%]
 - **Status:** Not implemented
