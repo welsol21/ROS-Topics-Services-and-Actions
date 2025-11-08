@@ -74,3 +74,6 @@ COMP9069_Assign1_2025.pdf
 Разбор assignment1.docx
 *.pdf
 *.docx
+
+# Ignore all test directories in the workspace
+**/test/**
