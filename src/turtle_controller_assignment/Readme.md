@@ -174,15 +174,59 @@ turtle_controller_assignment/
   ```
 - **Status:** COMPLETED AND TESTED
 
-### Task 5: Turtle Collection Action Server [25%]
-- **Status:** Not implemented
+### Task 5: Turtle Collection Action Server [30%]
 - **Node Name:** `turtle_collection_server`
+- **File:** `turtle_collection_server.py`
+- **Functionality:** Action server that moves `turtle1` to collect all other turtles using proportional control and the closest-turtle service.
+- **Action:** `collect_turtles` (`custom_interfaces/action/MoveTurtle`)
+- **Key Features:**
+  - Determines the current target by calling `/find_closest_turtle` (`FindClosestTurtle`)
+  - Proportional control: `vx = 2 * dr`, `ωz = 4 * dφ`
+  - Removes target when within `0.5` distance using `/kill`
+  - Publishes feedback with remaining distance
+  - Supports goal cancellation: stops `turtle1` and resets the simulation via `/reset`
+  - Pauses auto spawner during collection via `/spawner/disable`, re-enables via `/spawner/enable`
+  - Subscribes to pose topics for `turtle1` and all spawned turtles
+- **Required Services:**
+  - `/find_closest_turtle` (custom_interfaces/srv/FindClosestTurtle)
+  - `/kill` (turtlesim/srv/Kill)
+  - `/reset` (std_srvs/srv/Empty)
+  - `/spawner/enable` and `/spawner/disable` (std_srvs/srv/Trigger)
+    - Enable: resumes auto-spawning of new turtles
+    - Disable: pauses auto-spawning; existing turtles continue moving (targets remain dynamic)
+- **Topics:**
+  - `/turtle1/pose` (turtlesim/msg/Pose)
+  - `/<turtle>/pose` for other turtles
+  - `/turtle1/cmd_vel` (geometry_msgs/msg/Twist)
+- **Usage:**
+  ```bash
+  # Terminal 1 - turtlesim
+  ros2 run turtlesim turtlesim_node
 
-### Task 6: Action Client [15%]
+  # Terminal 2 - name manager
+  ros2 run turtle_controller_assignment turtle_name_manager
+
+  # Terminal 3 - monitor service
+  ros2 run turtle_controller_assignment turtle_monitor_service
+
+  # Terminal 4 - auto spawner (wait until 10 bots)
+  ros2 run turtle_controller_assignment auto_turtle_spawner
+
+  # Terminal 5 - closest turtle service
+  ros2 run turtle_controller_assignment closest_turtle_service
+
+  # Terminal 6 - collection action server
+  ros2 run turtle_controller_assignment turtle_collection_server
+
+  # Terminal 7 - action client
+  ros2 run turtle_controller_assignment turtle_collection_client
+  ```
+
+### Task 6: Action Client [10%]
 - **Status:** Not implemented
 - **Node Name:** `turtle_collection_client`
 
-### Task 7: Launch File [20%]
+### Task 7: Launch File [5%]
 - **Status:** Not implemented
 - **File Name:** `assignment_launch.py`
 
