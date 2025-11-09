@@ -25,22 +25,24 @@ from std_srvs.srv import Trigger
 from turtlesim.srv import Spawn, SetPen
 from geometry_msgs.msg import Twist
 
-# двигать ли также и turtle1 (DISABLED to avoid conflict with action server)
+
 MOVE_TURTLE1 = False
 
 
 class AutoTurtleSpawner(Node):
     def __init__(self):
+        # Node: spawns bots periodically; moves them in circles
+        # Integrates with name manager and monitor; supports enable/disable
         super().__init__('auto_turtle_spawner')
 
-        # Callback groups для избежания deadlock
+
         self.timer_cb_group = MutuallyExclusiveCallbackGroup()
         self.client_cb_group = MutuallyExclusiveCallbackGroup()
         
         # Flag to enable/disable spawning (for collection action)
         self.spawning_enabled = True
 
-        # --- клиенты сервисов ---
+
         self.cli_name    = self.create_client(Trigger, '/turtle_name_manager/generate_unique_name', callback_group=self.client_cb_group)
         self.cli_monitor = self.create_client(Trigger, '/monitor_turtles', callback_group=self.client_cb_group)
         self.cli_spawn   = self.create_client(Spawn,   '/spawn', callback_group=self.client_cb_group)
@@ -59,7 +61,7 @@ class AutoTurtleSpawner(Node):
             callback_group=self.client_cb_group
         )
 
-        # дождёмся сервисов
+
         for cli, path in [
             (self.cli_name, '/turtle_name_manager/generate_unique_name'),
             (self.cli_monitor, '/monitor_turtles'),
@@ -68,19 +70,19 @@ class AutoTurtleSpawner(Node):
             while not cli.wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for service: {path}')
 
-        # --- локальные структуры ---
-        self.max_additional = 10                  # лимит ДОПОЛНИТЕЛЬНЫХ черепашек (кроме turtle1)
-        self.my_turtles: set[str] = set()         # имена наших дополнительных
+
+        self.max_additional = 10
+        self.my_turtles: set[str] = set()
         self.cmd_pubs: dict[str, Publisher] = {}   # name -> /<name>/cmd_vel
-        self.omega: dict[str, float] = {}         # name -> угловая скорость
+        self.omega: dict[str, float] = {}
         if MOVE_TURTLE1:
             self.turtle1_pub = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
 
-        # --- таймеры ---
+
         self.spawn_interval = float(self.declare_parameter('spawn_interval', 5.0).value)
-        self.spawn_timer = self.create_timer(self.spawn_interval, self._try_spawn, callback_group=self.timer_cb_group)  # спавн каждые spawn_interval секунд
-        self.move_timer   = self.create_timer(0.1, self._move_all, callback_group=self.timer_cb_group) # движение
-        self._tick = 0  # для редкого логирования из таймера движения
+        self.spawn_timer = self.create_timer(self.spawn_interval, self._try_spawn, callback_group=self.timer_cb_group)
+        self.move_timer   = self.create_timer(0.1, self._move_all, callback_group=self.timer_cb_group)
+        self._tick = 0
 
         self.get_logger().info('🧩 AutoTurtleSpawner started')
     
@@ -100,9 +102,10 @@ class AutoTurtleSpawner(Node):
         self.get_logger().info('⏸️  Auto spawner disabled')
         return response
 
-    # ---------- утилиты вызова Trigger ----------
+
+    # Helper: call Trigger service with a small timeout
     def _call_trigger(self, client, timeout_sec=2.0) -> str:
-        """Синхронно вызывает Trigger сервис с таймаутом"""
+
         if not client.service_is_ready():
             self.get_logger().warning(f'Service {client.srv_name} not ready')
             return ''
@@ -110,7 +113,7 @@ class AutoTurtleSpawner(Node):
         req = Trigger.Request()
         fut = client.call_async(req)
         
-        # Ждем результат с таймаутом
+
         start = time.time()
         while not fut.done() and (time.time() - start) < timeout_sec:
             time.sleep(0.01)
@@ -124,17 +127,16 @@ class AutoTurtleSpawner(Node):
         
         return ''
 
+    # Get a unique turtle name from name manager
     def _get_unique_name(self) -> str:
         name = (self._call_trigger(self.cli_name) or '').strip()
         if not name:
             self.get_logger().error('Name manager returned empty name')
         return name
 
+    # Read monitor state and return (active_set, removed_set)
     def _ask_monitor(self) -> tuple[set[str], set[str]]:
-        """
-        Читает монитор и возвращает (active_set, removed_set).
-        Ожидаем формат: "ACTIVE:a,b;REMOVED:x,y".
-        """
+
         raw = self._call_trigger(self.cli_monitor)
         active, removed = set(), set()
         if raw:
@@ -147,9 +149,10 @@ class AutoTurtleSpawner(Node):
                     removed = set([x for x in payload.split(',') if x])
         return active, removed
 
-    # ---------- основная логика ----------
+
+    # Decide when to spawn based on monitor counts and max_additional
     def _try_spawn(self):
-        """Вызывается каждые 5 секунд для попытки создать новую черепашку"""
+
         # Skip if spawning is disabled
         if not self.spawning_enabled:
             return
@@ -158,13 +161,13 @@ class AutoTurtleSpawner(Node):
         
         self.get_logger().info(f'🔍 Monitor status - ACTIVE: {active}, REMOVED: {removed}')
 
-        # почистим локальные структуры по REMOVED
+
         for name in list(self.my_turtles):
             if name in removed:
                 self.get_logger().warn(f'Cleanup removed turtle reported by monitor: {name}')
                 self._cleanup(name)
 
-        # считаем количество дополнительных черепашек (исключая turtle1)
+
         additional_active = len([n for n in active if n != 'turtle1'])
         self.get_logger().info(f'📊 Additional turtles: {additional_active}/{self.max_additional} (total: {len(active)})')
         
@@ -182,24 +185,24 @@ class AutoTurtleSpawner(Node):
         
         self.get_logger().info(f'📝 Got unique name from manager: {name}')
 
-        # Генерация координат по формуле из задания
-        # r ~ U(1, 5)
+
+
         r = random.uniform(1.0, 5.0)
-        # φ ~ U(0, 2π)
+
         phi = random.uniform(0.0, 2.0 * math.pi)
-        # x' ~ U(-5.5+r, 5.5-r)
+
         x_prime = random.uniform(-5.5 + r, 5.5 - r)
-        # y' ~ U(-5.5+r, 5.5-r)
+
         y_prime = random.uniform(-5.5 + r, 5.5 - r)
-        # x = 5.5 + x' + r*cos(φ)
+
         x = 5.5 + x_prime + r * math.cos(phi)
-        # y = 5.5 + y' + r*sin(φ)
+
         y = 5.5 + y_prime + r * math.sin(phi)
-        # θ = φ ± π/2 (случайный выбор знака)
+
         direction = random.choice([-1.0, 1.0])
         theta = phi + direction * math.pi / 2.0
 
-        # вызов /spawn
+
         if not self.cli_spawn.service_is_ready():
             self.get_logger().warning('Spawn service not ready')
             return
@@ -243,10 +246,11 @@ class AutoTurtleSpawner(Node):
             req.b = 0
             req.width = 1
             req.off = True
-            cli.call_async(req)  # без ожидания
+            cli.call_async(req)
         except Exception:
             pass
 
+    # Move all tracked bots in circles; sync publishers with monitor
     def _move_all(self):
         moved = 0
         # Sync with monitor: create publishers for any active turtles (excluding turtle1)

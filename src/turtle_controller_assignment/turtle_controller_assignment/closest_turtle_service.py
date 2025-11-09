@@ -6,6 +6,7 @@ from custom_interfaces.srv import FindClosestTurtle
 from turtlesim.msg import Pose
 
 
+# Service: returns closest turtle to turtle1
 class ClosestTurtleService(Node):
     def __init__(self):
         super().__init__('closest_turtle_service')
@@ -28,6 +29,7 @@ class ClosestTurtleService(Node):
         
         self.get_logger().info('🎯 Closest Turtle Service started')
     
+    # Ensure subscription to a turtle's pose if not already subscribed
     def _ensure_subscription(self, name: str):
         """Subscribe to a turtle's pose topic if not already subscribed"""
         if name in self.turtle_poses:
@@ -46,6 +48,7 @@ class ClosestTurtleService(Node):
         """Callback for pose updates"""
         self.turtle_poses[name] = msg
     
+    # Scan topics and manage subscriptions to active turtles
     def _scan_topics(self):
         """Scan for new turtle pose topics and subscribe to them"""
         topic_list = self.get_topic_names_and_types()
@@ -73,6 +76,7 @@ class ClosestTurtleService(Node):
                 self.get_logger().info(f'🗑️  Removing disappeared turtle: {turtle_name}')
                 del self.turtle_poses[turtle_name]
     
+    # Service callback: compute closest turtle to turtle1
     def on_find_closest(self, request, response):
         """Service callback to find the closest turtle to turtle1"""
         

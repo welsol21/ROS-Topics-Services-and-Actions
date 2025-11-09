@@ -161,7 +161,6 @@ turtle_controller_assignment/
   3. ros2 run turtle_controller_assignment turtle_monitor_service
   4. ros2 run turtle_controller_assignment auto_turtle_spawner
   5. ros2 run turtle_controller_assignment closest_turtle_service
-  6. ros2 run turtle_controller_assignment closest_turtle_client
 
 ### Task 5: Turtle Collection Action Server [30%]
 - **Node Name:** `turtle_collection_server`

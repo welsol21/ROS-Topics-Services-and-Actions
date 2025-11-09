@@ -36,7 +36,7 @@ class MoveTurtleActionClient(Node):
         self.get_result_future = goal_handle.get_result_async()
         self.get_result_future.add_done_callback(self.get_result_callback)
 
-        # Таймер отмены через 10 секунд
+
         self.timer = self.create_timer(10.0, self.timer_callback)
 
     def timer_callback(self):

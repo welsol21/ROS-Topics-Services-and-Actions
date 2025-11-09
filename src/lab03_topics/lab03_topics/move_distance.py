@@ -19,12 +19,12 @@ class MoveDistance(Node):
         if not self.moving:
             return
 
-        # Проверка выхода за границы поля
+
         if msg.x < 0.5 or msg.x > 10.5 or msg.y < 0.5 or msg.y > 10.5:
             self.get_logger().info('Boundary reached — stopping')
             self.publisher.publish(Twist())
             self.moving = False
-            return  # выходим из функции, чтобы не считать расстояние
+            return
 
         if self.prev_pose is None:
             self.prev_pose = msg

@@ -13,6 +13,7 @@ from custom_interfaces.action import MoveTurtle
 from std_srvs.srv import Trigger
 
 
+# Action client: starts collection when bots ≥ threshold
 class TurtleCollectionClient(Node):
     def __init__(self):
         super().__init__('turtle_collection_client')
@@ -43,9 +44,10 @@ class TurtleCollectionClient(Node):
         self.create_timer(1.0, self.check_turtle_count)
         # Timer to check cancellation condition during an active goal
         self.create_timer(1.0, self.check_cancel_condition)
-        # Store goal handle for cancellation (минимально, строго под требование отмены)
+        # Store goal handle for cancellation
         self.goal_handle = None
     
+    # Periodically start collection when enough bots are active
     def check_turtle_count(self):
         """Periodically check turtle count and start collection when 10 bots present"""
         # Skip if collection already in progress
@@ -97,6 +99,7 @@ class TurtleCollectionClient(Node):
         )
         send_goal_future.add_done_callback(self.goal_response_callback)
     
+    # Cancel goal if environment grows beyond threshold during execution
     def check_cancel_condition(self):
         """Cancel goal if bots >= 10 during collection"""
         if not self.collection_in_progress or not self.monitor_client.service_is_ready():

@@ -27,6 +27,7 @@ from custom_interfaces.action import MoveTurtle
 from custom_interfaces.srv import FindClosestTurtle
 
 
+# Action server: collects turtles using proportional control
 class TurtleCollectionServer(Node):
     def __init__(self):
         super().__init__('turtle_collection_server')
@@ -133,6 +134,7 @@ class TurtleCollectionServer(Node):
         """Store pose for a specific turtle"""
         self.turtle_poses[turtle_name] = msg
     
+    # Accept or reject goal requests based on current execution and available targets
     def goal_callback(self, goal_request):
         """Accept or reject goal based on system state"""
         # Reject if another goal is already executing
@@ -238,6 +240,7 @@ class TurtleCollectionServer(Node):
         
         return angle_diff
     
+    # Remove a turtle via /kill and clean local tracking
     def _kill_turtle(self, turtle_name: str):
         """Remove a turtle from the simulation"""
         if not self.kill_client.service_is_ready():
@@ -256,6 +259,7 @@ class TurtleCollectionServer(Node):
         self.get_logger().info(f'💀 Collected turtle: {turtle_name}')
         return True
     
+    # Main execution loop: lock target, move towards it, collect or handle loss
     def execute_callback(self, goal_handle):
         """Execute the turtle collection action"""
         self.goal_executing = True
