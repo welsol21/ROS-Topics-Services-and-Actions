@@ -76,4 +76,4 @@ COMP9069_Assign1_2025.pdf
 *.docx
 
 # Ignore all test directories in the workspace
-**/test/**
+# **/test/**
