@@ -77,7 +77,8 @@ class AutoTurtleSpawner(Node):
             self.turtle1_pub = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
 
         # --- таймеры ---
-        self.spawn_timer = self.create_timer(5.0, self._try_spawn, callback_group=self.timer_cb_group)  # спавн каждые 5 секунд
+        self.spawn_interval = float(self.declare_parameter('spawn_interval', 5.0).value)
+        self.spawn_timer = self.create_timer(self.spawn_interval, self._try_spawn, callback_group=self.timer_cb_group)  # спавн каждые spawn_interval секунд
         self.move_timer   = self.create_timer(0.1, self._move_all, callback_group=self.timer_cb_group) # движение
         self._tick = 0  # для редкого логирования из таймера движения
 
@@ -211,9 +212,15 @@ class AutoTurtleSpawner(Node):
 
         fut = self.cli_spawn.call_async(req)
         
-        # Ждем результат с таймаутом
+        # Prepare movement immediately; spawn may complete asynchronously
+        self.my_turtles.add(name)
+        self._pen_off(name)
+        self.cmd_pubs[name] = self.create_publisher(Twist, f'/{name}/cmd_vel', 10)
+        self.omega[name] = direction * (1.0 / r)
+        
+        # Wait for result up to 5s; log only
         start = time.time()
-        while not fut.done() and (time.time() - start) < 2.0:
+        while not fut.done() and (time.time() - start) < 5.0:
             time.sleep(0.01)
         
         if not fut.done():
@@ -221,21 +228,10 @@ class AutoTurtleSpawner(Node):
             return
         
         res = fut.result()
-        if not res:
+        if res:
+            self.get_logger().info(f'✅ Spawned: {res.name}')
+        else:
             self.get_logger().error(f'Failed to spawn {name}')
-            return
-
-        spawned = res.name
-        self.get_logger().info(f'✅ Spawned: {spawned}')
-        self.my_turtles.add(spawned)
-
-        # выключим ручку
-        self._pen_off(spawned)
-
-        # подготовим паблишер для движения
-        self.cmd_pubs[spawned] = self.create_publisher(Twist, f'/{spawned}/cmd_vel', 10)
-        self.omega[spawned] = direction * (1.0 / r)
-
     def _pen_off(self, name: str):
         try:
             cli = self.create_client(SetPen, f'/{name}/set_pen')
@@ -253,7 +249,21 @@ class AutoTurtleSpawner(Node):
 
     def _move_all(self):
         moved = 0
-        # двигаем наших дополнительных
+        # Sync with monitor: create publishers for any active turtles (excluding turtle1)
+        active, removed = self._ask_monitor()
+        for name in list(removed):
+            if name in self.my_turtles:
+                self.get_logger().warn(f'Cleanup removed turtle reported by monitor: {name}')
+                self._cleanup(name)
+        for name in list(active):
+            if name != 'turtle1' and name not in self.cmd_pubs:
+                # Prepare publisher and omega for externally spawned turtles
+                self.cmd_pubs[name] = self.create_publisher(Twist, f'/{name}/cmd_vel', 10)
+                # Default angular speed if radius unknown
+                self.omega[name] = random.choice([-1.0, 1.0]) * 0.8
+                self.my_turtles.add(name)
+        
+        # Move all known additional turtles
         for name, pub in list(self.cmd_pubs.items()):
             if name not in self.my_turtles:
                 continue
@@ -262,16 +272,16 @@ class AutoTurtleSpawner(Node):
             tw.angular.z = float(self.omega.get(name, 0.8))
             pub.publish(tw)
             moved += 1
-
-        # (опционально) двигаем и turtle1
+        
+        # (optionally) move turtle1
         if MOVE_TURTLE1:
             tw = Twist()
             tw.linear.x = 1.0
             tw.angular.z = 1.0
             self.turtle1_pub.publish(tw)
             moved += 1
-
-        # «пульс», чтобы видеть, что таймер жив
+        
+        # heartbeat
         self._tick += 1
         if self._tick % 10 == 0:
             self.get_logger().info(f'🟢 move-timer tick, publishing to {moved} turtle(s)')

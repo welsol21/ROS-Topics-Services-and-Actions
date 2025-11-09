@@ -240,8 +240,17 @@ turtle_controller_assignment/
   ```
 
 ### Task 7: Launch File [5%]
-- **Status:** Not implemented
+- **Status:** Implemented
 - **File Name:** `assignment_launch.py`
+- **Description:** Single parameterized launch that starts turtlesim, services, action server, spawner, and client in strict event-driven order (each waits for prerequisites). Supports configurable spawn interval.
+- **Usage:**
+  ```bash
+  # Default spawn interval (5.0s)
+  ros2 launch turtle_controller_assignment assignment_launch.py
+
+  # Custom spawn interval (e.g., 2.0s)
+  ros2 launch turtle_controller_assignment assignment_launch.py spawn_interval:=2.0
+  ```
 
 ---
 

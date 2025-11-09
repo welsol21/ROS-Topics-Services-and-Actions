@@ -73,9 +73,9 @@ class TurtleCollectionClient(Node):
                 # Count bots (excluding turtle1)
                 bot_count = sum(1 for t in active_turtles if t != 'turtle1')
                 
-                # Start collection when 10 or more bots present
-                if bot_count >= 1:
-                    self.get_logger().info(f'Starting collection with {bot_count} active bots...')
+                # Start collection when 3 or more bots present
+                if bot_count >= 3:
+                    self.get_logger().info(f'Starting collection with {bot_count} active bots (>=3)...')
                     self.send_goal()
         except Exception as e:
             self.get_logger().error(f'Error checking turtle count: {e}')
