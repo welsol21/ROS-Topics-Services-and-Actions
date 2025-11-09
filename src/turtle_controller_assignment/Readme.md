@@ -23,7 +23,6 @@ turtle_controller_assignment/
     ├── auto_turtle_spawner.py       # Task 3 (auto spawner)
     ├── turtle_monitor_service.py    # Monitoring Service
     ├── closest_turtle_service.py    # Task 4 (service server)
-    ├── closest_turtle_client.py     # Task 4 (test client)
     ├── turtle_collection_server.py  # Task 5 (action server)
     └── turtle_collection_client.py  # Task 6 (action client)
 ```
@@ -44,9 +43,9 @@ turtle_controller_assignment/
   - `/spawn` (turtlesim/srv/Spawn)
   - `/turtle_name_manager/generate_unique_name` (std_srvs/Trigger)
 - **Launch Order:**
-  1. ros2 run turtlesim turtlesim_node
-  2. ros2 run turtle_controller_assignment turtle_name_manager
-  3. ros2 run turtle_controller_assignment turtle_spawn_client
+  1. `ros2 run turtlesim turtlesim_node`
+  2. `ros2 run turtle_controller_assignment turtle_name_manager`
+  3. `ros2 run turtle_controller_assignment turtle_spawn_client`
 
 ---
 
@@ -68,8 +67,8 @@ turtle_controller_assignment/
 - **Required Services:**
   - `/turtle1/set_pen` (turtlesim/srv/SetPen)
 - **Launch Order:**
-  1. ros2 run turtlesim turtlesim_node
-  2. ros2 run turtle_controller_assignment pen_control_client
+  1. `ros2 run turtlesim turtlesim_node`
+  2. `ros2 run turtle_controller_assignment pen_control_client`
 ---
 
 ### Turtle Name Management System
@@ -119,11 +118,10 @@ turtle_controller_assignment/
   - `/<turtle_name>/set_pen` (turtlesim/srv/SetPen)
 
 - **Launch Order:**
-  1. ros2 run turtlesim turtlesim_node
-  2. ros2 run turtle_controller_assignment turtle_name_manager
-  3. ros2 run turtle_controller_assignment turtle_monitor_service
-  4. ros2 run turtle_controller_assignment auto_turtle_spawner
-
+  1. `ros2 run turtlesim turtlesim_node`
+  2. `ros2 run turtle_controller_assignment turtle_name_manager`
+  3. `ros2 run turtle_controller_assignment turtle_monitor_service`
+  4. `ros2 run turtle_controller_assignment auto_turtle_spawner`
 
 
 ### Task 4: Closest Turtle Service Server [15%]
@@ -156,11 +154,12 @@ turtle_controller_assignment/
   - `/find_closest_turtle` server (this node)
   - Prerequisites: `/monitor_turtles` (std_srvs/Trigger) and pose topics discovered by monitor
 - **Launch Order:**
-  1. ros2 run turtlesim turtlesim_node
-  2. ros2 run turtle_controller_assignment turtle_name_manager
-  3. ros2 run turtle_controller_assignment turtle_monitor_service
-  4. ros2 run turtle_controller_assignment auto_turtle_spawner
-  5. ros2 run turtle_controller_assignment closest_turtle_service
+  1. `ros2 run turtlesim turtlesim_node`
+  2. `ros2 run turtle_controller_assignment turtle_name_manager`
+  3. `ros2 run turtle_controller_assignment turtle_monitor_service`
+  4. `ros2 run turtle_controller_assignment auto_turtle_spawner`
+  5. `ros2 run turtle_controller_assignment closest_turtle_service`
+  6. `ros2 run turtle_controller_assignment closest_turtle_client`
 
 ### Task 5: Turtle Collection Action Server [30%]
 - **Node Name:** `turtle_collection_server`
@@ -187,13 +186,13 @@ turtle_controller_assignment/
   - `/<turtle>/pose` for other turtles
   - `/turtle1/cmd_vel` (geometry_msgs/msg/Twist)
 - **Launch Order:**
-  1. ros2 run turtlesim turtlesim_node
-  2. ros2 run turtle_controller_assignment turtle_name_manager
-  3. ros2 run turtle_controller_assignment turtle_monitor_service
-  4. ros2 run turtle_controller_assignment closest_turtle_service
-  5. ros2 run turtle_controller_assignment turtle_collection_server
-  6. ros2 run turtle_controller_assignment auto_turtle_spawner
-  7. ros2 run turtle_controller_assignment turtle_collection_client
+  1. `ros2 run turtlesim turtlesim_node`
+  2. `ros2 run turtle_controller_assignment turtle_name_manager`
+  3. `ros2 run turtle_controller_assignment turtle_monitor_service`
+  4. `ros2 run turtle_controller_assignment closest_turtle_service`
+  5. `ros2 run turtle_controller_assignment turtle_collection_server`
+  6. `ros2 run turtle_controller_assignment auto_turtle_spawner`
+  7. `ros2 run turtle_controller_assignment turtle_collection_client`
 ### Task 6: Action Client [10%]
 - **Status:** Implemented
 - **Node Name:** `turtle_collection_client`
@@ -204,20 +203,19 @@ turtle_controller_assignment/
   - Real-time cancellation rule: cancels the current goal if bots left to collect ≥ 10 at any time during the action.
   - After cancel: logs failure, server resets simulation, client becomes ready for the next collection.
 - **Verification of real-time cancellation:**
-  - Use the parameterized launch to adjust the spawner interval. To quickly exceed the bot threshold and observe client-side cancellation, run:
-    `ros2 launch turtle_controller_assignment assignment_launch.py spawn_interval:=2.0`
-  - To restore normal operation, launch without the parameter (default 5.0s).
+  - For testing only, we temporarily kept the spawner enabled during the goal and accelerated the spawn interval to 0.5s. This allowed bots to exceed the threshold during an active goal. The client then logged: `Bots left to collect: 10` and `Canceling goal: active bots=10 (>=10)`, followed by `Collection failed`.
+  - The temporary test changes have been reverted: server again disables the spawner at goal start, and the spawner interval is 5 seconds per assignment.
 - **Required Services:**
   - `/collect_turtles` action server (`turtle_collection_server`)
   - `/find_closest_turtle` service (for server’s target selection)
 - **Launch Order:**
-  1. ros2 run turtlesim turtlesim_node
-  2. ros2 run turtle_controller_assignment turtle_name_manager
-  3. ros2 run turtle_controller_assignment turtle_monitor_service
-  4. ros2 run turtle_controller_assignment closest_turtle_service
-  5. ros2 run turtle_controller_assignment turtle_collection_server
-  6. ros2 run turtle_controller_assignment auto_turtle_spawner
-  7. ros2 run turtle_controller_assignment turtle_collection_client
+  1. `ros2 run turtlesim turtlesim_node`
+  2. `ros2 run turtle_controller_assignment turtle_name_manager`
+  3. `ros2 run turtle_controller_assignment turtle_monitor_service`
+  4. `ros2 run turtle_controller_assignment closest_turtle_service`
+  5. `ros2 run turtle_controller_assignment turtle_collection_server`
+  6. `ros2 run turtle_controller_assignment auto_turtle_spawner`
+  7. `ros2 run turtle_controller_assignment turtle_collection_client`
 ### Task 7: Launch File [5%]
 - **Status:** Implemented
 - **File Name:** `assignment_launch.py`
@@ -231,7 +229,6 @@ turtle_controller_assignment/
 ## Build the package
 ```bash
 cd ~/ros2_ws
-source /opt/ros/humble/setup.bash
 colcon build --packages-select turtle_controller_assignment
 source install/setup.bash
 ```
