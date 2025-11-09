@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
-# coding: utf-8
 """
-Task 3: Auto Turtle Spawner
-
-- Spawns a turtle at random coordinates every 5 seconds
-- Sets it moving on a circular path with pen turned off
-- Ensures at most 10 additionally spawned turtles (excluding turtle1)
-- Coordinates formula: r~U(1,5), φ~U(0,2π), x'~U(-5.5+r,5.5-r), y'~U(-5.5+r,5.5-r)
-  x = 5.5 + x' + r*cos(φ), y = 5.5 + y' + r*sin(φ), θ = φ ± π/2
-- Velocities: vx = 1.0, ωz = ±1/r
+Task 3: Auto Turtle Spawner - spawns bots periodically and moves them in circles
 """
 
 import math
@@ -25,24 +17,23 @@ from std_srvs.srv import Trigger
 from turtlesim.srv import Spawn, SetPen
 from geometry_msgs.msg import Twist
 
-
+# Whether to also move turtle1 (disabled to avoid conflict)
 MOVE_TURTLE1 = False
 
 
 class AutoTurtleSpawner(Node):
+    """Node: spawns bots periodically and moves them in circles"""
     def __init__(self):
-        # Node: spawns bots periodically; moves them in circles
-        # Integrates with name manager and monitor; supports enable/disable
         super().__init__('auto_turtle_spawner')
 
-
+        # Callback groups to avoid deadlocks
         self.timer_cb_group = MutuallyExclusiveCallbackGroup()
         self.client_cb_group = MutuallyExclusiveCallbackGroup()
         
         # Flag to enable/disable spawning (for collection action)
         self.spawning_enabled = True
 
-
+        # Service clients
         self.cli_name    = self.create_client(Trigger, '/turtle_name_manager/generate_unique_name', callback_group=self.client_cb_group)
         self.cli_monitor = self.create_client(Trigger, '/monitor_turtles', callback_group=self.client_cb_group)
         self.cli_spawn   = self.create_client(Spawn,   '/spawn', callback_group=self.client_cb_group)
@@ -61,7 +52,7 @@ class AutoTurtleSpawner(Node):
             callback_group=self.client_cb_group
         )
 
-
+        # Wait for services
         for cli, path in [
             (self.cli_name, '/turtle_name_manager/generate_unique_name'),
             (self.cli_monitor, '/monitor_turtles'),
@@ -70,19 +61,18 @@ class AutoTurtleSpawner(Node):
             while not cli.wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for service: {path}')
 
-
-        self.max_additional = 10
-        self.my_turtles: set[str] = set()
+        # Local structures
+        self.max_additional = 10                  # limit of additional turtles (excluding turtle1)
+        self.my_turtles: set[str] = set()         # names of our additional turtles
         self.cmd_pubs: dict[str, Publisher] = {}   # name -> /<name>/cmd_vel
-        self.omega: dict[str, float] = {}
+        self.omega: dict[str, float] = {}         # name -> angular velocity
         if MOVE_TURTLE1:
             self.turtle1_pub = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
 
-
-        self.spawn_interval = float(self.declare_parameter('spawn_interval', 5.0).value)
-        self.spawn_timer = self.create_timer(self.spawn_interval, self._try_spawn, callback_group=self.timer_cb_group)
-        self.move_timer   = self.create_timer(0.1, self._move_all, callback_group=self.timer_cb_group)
-        self._tick = 0
+        # Timers
+        self.spawn_timer = self.create_timer(5.0, self._try_spawn, callback_group=self.timer_cb_group)  # spawn every 5 seconds
+        self.move_timer   = self.create_timer(0.1, self._move_all, callback_group=self.timer_cb_group) # movement
+        self._tick = 0  # для редкого логирования из таймера движения
 
         self.get_logger().info('🧩 AutoTurtleSpawner started')
     
@@ -102,10 +92,9 @@ class AutoTurtleSpawner(Node):
         self.get_logger().info('⏸️  Auto spawner disabled')
         return response
 
-
-    # Helper: call Trigger service with a small timeout
+    # ---------- Trigger call utilities ----------
     def _call_trigger(self, client, timeout_sec=2.0) -> str:
-
+        """Synchronously call Trigger service with timeout"""
         if not client.service_is_ready():
             self.get_logger().warning(f'Service {client.srv_name} not ready')
             return ''
@@ -113,7 +102,7 @@ class AutoTurtleSpawner(Node):
         req = Trigger.Request()
         fut = client.call_async(req)
         
-
+        # Wait for result with timeout
         start = time.time()
         while not fut.done() and (time.time() - start) < timeout_sec:
             time.sleep(0.01)
@@ -127,16 +116,17 @@ class AutoTurtleSpawner(Node):
         
         return ''
 
-    # Get a unique turtle name from name manager
     def _get_unique_name(self) -> str:
         name = (self._call_trigger(self.cli_name) or '').strip()
         if not name:
             self.get_logger().error('Name manager returned empty name')
         return name
 
-    # Read monitor state and return (active_set, removed_set)
     def _ask_monitor(self) -> tuple[set[str], set[str]]:
-
+        """
+        Read monitor and return (active_set, removed_set).
+        Expected format: "ACTIVE:a,b;REMOVED:x,y".
+        """
         raw = self._call_trigger(self.cli_monitor)
         active, removed = set(), set()
         if raw:
@@ -149,10 +139,9 @@ class AutoTurtleSpawner(Node):
                     removed = set([x for x in payload.split(',') if x])
         return active, removed
 
-
-    # Decide when to spawn based on monitor counts and max_additional
+    # ---------- Main logic ----------
     def _try_spawn(self):
-
+        """Called every 5 seconds to attempt to spawn a turtle"""
         # Skip if spawning is disabled
         if not self.spawning_enabled:
             return
@@ -161,13 +150,13 @@ class AutoTurtleSpawner(Node):
         
         self.get_logger().info(f'🔍 Monitor status - ACTIVE: {active}, REMOVED: {removed}')
 
-
+        # clean local structures for REMOVED
         for name in list(self.my_turtles):
             if name in removed:
                 self.get_logger().warn(f'Cleanup removed turtle reported by monitor: {name}')
                 self._cleanup(name)
 
-
+        # count additional turtles (excluding turtle1)
         additional_active = len([n for n in active if n != 'turtle1'])
         self.get_logger().info(f'📊 Additional turtles: {additional_active}/{self.max_additional} (total: {len(active)})')
         
@@ -185,24 +174,24 @@ class AutoTurtleSpawner(Node):
         
         self.get_logger().info(f'📝 Got unique name from manager: {name}')
 
-
-
+        # Generate coordinates per assignment formula
+        # r ~ U(1, 5)
         r = random.uniform(1.0, 5.0)
-
+        # φ ~ U(0, 2π)
         phi = random.uniform(0.0, 2.0 * math.pi)
-
+        # x' ~ U(-5.5+r, 5.5-r)
         x_prime = random.uniform(-5.5 + r, 5.5 - r)
-
+        # y' ~ U(-5.5+r, 5.5-r)
         y_prime = random.uniform(-5.5 + r, 5.5 - r)
-
+        # x = 5.5 + x' + r*cos(φ)
         x = 5.5 + x_prime + r * math.cos(phi)
-
+        # y = 5.5 + y' + r*sin(φ)
         y = 5.5 + y_prime + r * math.sin(phi)
-
+        # θ = φ ± π/2 (random sign)
         direction = random.choice([-1.0, 1.0])
         theta = phi + direction * math.pi / 2.0
 
-
+        # call /spawn
         if not self.cli_spawn.service_is_ready():
             self.get_logger().warning('Spawn service not ready')
             return
@@ -215,15 +204,9 @@ class AutoTurtleSpawner(Node):
 
         fut = self.cli_spawn.call_async(req)
         
-        # Prepare movement immediately; spawn may complete asynchronously
-        self.my_turtles.add(name)
-        self._pen_off(name)
-        self.cmd_pubs[name] = self.create_publisher(Twist, f'/{name}/cmd_vel', 10)
-        self.omega[name] = direction * (1.0 / r)
-        
-        # Wait for result up to 5s; log only
+        # Ждем результат с таймаутом
         start = time.time()
-        while not fut.done() and (time.time() - start) < 5.0:
+        while not fut.done() and (time.time() - start) < 2.0:
             time.sleep(0.01)
         
         if not fut.done():
@@ -231,10 +214,21 @@ class AutoTurtleSpawner(Node):
             return
         
         res = fut.result()
-        if res:
-            self.get_logger().info(f'✅ Spawned: {res.name}')
-        else:
+        if not res:
             self.get_logger().error(f'Failed to spawn {name}')
+            return
+
+        spawned = res.name
+        self.get_logger().info(f'✅ Spawned: {spawned}')
+        self.my_turtles.add(spawned)
+
+        # turn pen off
+        self._pen_off(spawned)
+
+        # prepare publisher for movement
+        self.cmd_pubs[spawned] = self.create_publisher(Twist, f'/{spawned}/cmd_vel', 10)
+        self.omega[spawned] = direction * (1.0 / r)
+
     def _pen_off(self, name: str):
         try:
             cli = self.create_client(SetPen, f'/{name}/set_pen')
@@ -246,28 +240,13 @@ class AutoTurtleSpawner(Node):
             req.b = 0
             req.width = 1
             req.off = True
-            cli.call_async(req)
+            cli.call_async(req)  # без ожидания
         except Exception:
             pass
 
-    # Move all tracked bots in circles; sync publishers with monitor
     def _move_all(self):
         moved = 0
-        # Sync with monitor: create publishers for any active turtles (excluding turtle1)
-        active, removed = self._ask_monitor()
-        for name in list(removed):
-            if name in self.my_turtles:
-                self.get_logger().warn(f'Cleanup removed turtle reported by monitor: {name}')
-                self._cleanup(name)
-        for name in list(active):
-            if name != 'turtle1' and name not in self.cmd_pubs:
-                # Prepare publisher and omega for externally spawned turtles
-                self.cmd_pubs[name] = self.create_publisher(Twist, f'/{name}/cmd_vel', 10)
-                # Default angular speed if radius unknown
-                self.omega[name] = random.choice([-1.0, 1.0]) * 0.8
-                self.my_turtles.add(name)
-        
-        # Move all known additional turtles
+        # move our additional turtles
         for name, pub in list(self.cmd_pubs.items()):
             if name not in self.my_turtles:
                 continue
@@ -276,16 +255,16 @@ class AutoTurtleSpawner(Node):
             tw.angular.z = float(self.omega.get(name, 0.8))
             pub.publish(tw)
             moved += 1
-        
-        # (optionally) move turtle1
+
+        # optionally move turtle1
         if MOVE_TURTLE1:
             tw = Twist()
             tw.linear.x = 1.0
             tw.angular.z = 1.0
             self.turtle1_pub.publish(tw)
             moved += 1
-        
-        # heartbeat
+
+        # heartbeat to show timer is active
         self._tick += 1
         if self._tick % 10 == 0:
             self.get_logger().info(f'🟢 move-timer tick, publishing to {moved} turtle(s)')

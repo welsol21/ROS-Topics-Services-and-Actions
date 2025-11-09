@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
 """
-Task 5: Turtle Collection Action Server
-
-Action server that moves turtle1 to collect all other turtles by:
-1. Finding the closest turtle using /find_closest_turtle service
-2. Moving turtle1 towards it using proportional control (linear gain=2, angular gain=4)
-3. Removing the turtle when reached (distance < 0.5)
-4. Repeating until no turtles remain
-5. Publishing feedback with current target and distance
-6. Supporting goal cancellation with simulation reset
+Task 5: Turtle Collection Action Server - collects turtles using closest-turtle service and proportional control
 """
 
 import math
@@ -27,8 +19,8 @@ from custom_interfaces.action import MoveTurtle
 from custom_interfaces.srv import FindClosestTurtle
 
 
-# Action server: collects turtles using proportional control
 class TurtleCollectionServer(Node):
+    """Action server: collects turtles; disables spawner during collection"""
     def __init__(self):
         super().__init__('turtle_collection_server')
         
@@ -36,18 +28,10 @@ class TurtleCollectionServer(Node):
         self.turtle_poses = {}
         self.max_turtles = 11
         
-        # Track if a goal is currently executing to prevent parallel goals
-        self.goal_executing = False
-        # Current locked target name; only updated when collected or lost
-        self.current_target_name = None
-        
         # Control gains as specified in assignment
         self.linear_gain = 2.0
         self.angular_gain = 4.0
         self.collection_distance = 0.5
-        # Lost target re-checks (to handle turtles going off-screen briefly)
-        self.lost_target_retries = 4
-        self.lost_target_check_delay = 0.25
         
         # Publishers and subscribers
         self.cmd_vel_pub = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
@@ -134,14 +118,8 @@ class TurtleCollectionServer(Node):
         """Store pose for a specific turtle"""
         self.turtle_poses[turtle_name] = msg
     
-    # Accept or reject goal requests based on current execution and available targets
     def goal_callback(self, goal_request):
         """Accept or reject goal based on system state"""
-        # Reject if another goal is already executing
-        if self.goal_executing:
-            self.get_logger().warning('⚠️  Goal rejected: Another goal is already executing')
-            return GoalResponse.REJECT
-        
         # Count available turtles (excluding turtle1)
         available_turtles = sum(1 for name in self.turtle_poses.keys() 
                                if name != 'turtle1' and self.turtle_poses[name] is not None)
@@ -240,7 +218,6 @@ class TurtleCollectionServer(Node):
         
         return angle_diff
     
-    # Remove a turtle via /kill and clean local tracking
     def _kill_turtle(self, turtle_name: str):
         """Remove a turtle from the simulation"""
         if not self.kill_client.service_is_ready():
@@ -259,73 +236,57 @@ class TurtleCollectionServer(Node):
         self.get_logger().info(f'💀 Collected turtle: {turtle_name}')
         return True
     
-    # Main execution loop: lock target, move towards it, collect or handle loss
     def execute_callback(self, goal_handle):
         """Execute the turtle collection action"""
-        self.goal_executing = True
         self.get_logger().info('🎬 Starting turtle collection...')
+        
+        # Disable spawner to prevent interference
+        self._disable_spawner()
         
         feedback_msg = MoveTurtle.Feedback()
         collected_count = 0
         
         try:
-            # Main collection loop - only find new target when needed
             while True:
                 # Check for cancellation
                 if goal_handle.is_cancel_requested:
                     goal_handle.canceled()
                     self._stop_turtle1()
                     self._reset_simulation()
+                    self._enable_spawner()
                     self.get_logger().info('❌ Goal canceled, simulation reset')
                     return MoveTurtle.Result(success=False)
                 
-                # Use locked target if already set; otherwise find closest once with retry
-                target_name = self.current_target_name
-                if not target_name:
-                    for attempt in range(3):
-                        target_name, _ = self._find_closest_turtle()
-                        if target_name:
-                            break
-                        if attempt < 2:
-                            self.get_logger().debug(f'No target found, retrying... (attempt {attempt+1}/3)')
-                            time.sleep(0.5)
-                    if target_name:
-                        self.current_target_name = target_name
+                # Find closest turtle
+                target_name, _ = self._find_closest_turtle()
                 
                 if not target_name:
-                    # No more turtles to collect after retries
+                    # No more turtles to collect
                     self._stop_turtle1()
+                    self._enable_spawner()
                     self.get_logger().info(f'🎉 Collection complete! Collected {collected_count} turtles')
                     goal_handle.succeed()
                     return MoveTurtle.Result(success=True)
                 
-                self.get_logger().info(f'🎯 Targeting: {target_name} (locked until collected/lost)')
+                self.get_logger().info(f'🎯 Targeting: {target_name}')
                 
-                # Movement loop - stick to THIS target until reached or lost
+                # Move towards target until reached or lost
                 while True:
                     # Check cancellation
                     if goal_handle.is_cancel_requested:
                         goal_handle.canceled()
                         self._stop_turtle1()
                         self._reset_simulation()
+                        self._enable_spawner()
                         self.get_logger().info('❌ Goal canceled, simulation reset')
                         return MoveTurtle.Result(success=False)
                     
                     # Get target pose
                     target_pose = self.turtle_poses.get(target_name)
                     if not target_pose:
-                        # Target temporarily missing; retry to reacquire a few times
-                        for attempt in range(self.lost_target_retries):
-                            time.sleep(self.lost_target_check_delay)
-                            target_pose = self.turtle_poses.get(target_name)
-                            if target_pose:
-                                break
-                        if not target_pose:
-                            # Target truly lost after retries; unlock and find next
-                            self.get_logger().warning(f'⚠️  Lost target {target_name} after {self.lost_target_retries} retries, unlocking and finding next...')
-                            self.current_target_name = None
-                            break
-                        # Pose reacquired; continue movement without changing target
+                        # Target disappeared, find next one
+                        self.get_logger().warning(f'⚠️  Lost target {target_name}, finding next...')
+                        break
                     
                     # Calculate distance and angle
                     distance = self._get_distance(target_pose.x, target_pose.y)
@@ -337,15 +298,9 @@ class TurtleCollectionServer(Node):
                     
                     # Check if reached
                     if distance < self.collection_distance:
-                        if self._kill_turtle(target_name):
-                            collected_count += 1
-                            # Clear current target lock after collection
-                            self.current_target_name = None
-                            break
-                        else:
-                            # Kill failed, target might already be gone
-                            self.current_target_name = None
-                            break
+                        self._kill_turtle(target_name)
+                        collected_count += 1
+                        break
                     
                     # Move towards target with proportional control
                     move_msg = Twist()
@@ -367,11 +322,9 @@ class TurtleCollectionServer(Node):
         except Exception as e:
             self.get_logger().error(f'❌ Error during collection: {e}')
             self._stop_turtle1()
+            self._enable_spawner()
             goal_handle.abort()
             return MoveTurtle.Result(success=False)
-        finally:
-            # Always clear the flag when execution ends
-            self.goal_executing = False
 
 
 def main(args=None):
