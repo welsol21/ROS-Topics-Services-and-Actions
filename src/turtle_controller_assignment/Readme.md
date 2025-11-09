@@ -13,15 +13,19 @@ turtle_controller_assignment/
 ├── setup.cfg
 ├── resource/
 │   └── turtle_controller_assignment
+├── launch/
+│   └── assignment_launch.py        # Task 7 (Unified launch)
 └── turtle_controller_assignment/
     ├── __init__.py
-    ├── turtle_spawn_client.py       # Task 1
+    ├── turtle_spawn_client.py       # Task 1 (manual spawner)
     ├── turtle_name_manager.py       # Name Management Service
-    ├── pen_control_client.py        # Task 2
-    ├── auto_turtle_spawner.py       # Task 3
+    ├── pen_control_client.py        # Task 2 (pen control)
+    ├── auto_turtle_spawner.py       # Task 3 (auto spawner)
     ├── turtle_monitor_service.py    # Monitoring Service
-    ├── closest_turtle_service.py    # Task 4 - Service Server
-    └── closest_turtle_client.py     # Task 4 - Test Client
+    ├── closest_turtle_service.py    # Task 4 (service server)
+    ├── closest_turtle_client.py     # Task 4 (test client)
+    ├── turtle_collection_server.py  # Task 5 (action server)
+    └── turtle_collection_client.py  # Task 6 (action client)
 ```
 
 ---
@@ -36,7 +40,13 @@ turtle_controller_assignment/
   - Requests unique names from Turtle Name Manager service
   - Guarantees unique turtle names without conflicts
   - Handles service availability and errors gracefully
-- **Usage:** `ros2 run turtle_controller_assignment turtle_spawn_client`
+- **Required Services:**
+  - `/spawn` (turtlesim/srv/Spawn)
+  - `/turtle_name_manager/generate_unique_name` (std_srvs/Trigger)
+- **Launch Order:**
+  1. ros2 run turtlesim turtlesim_node
+  2. ros2 run turtle_controller_assignment turtle_name_manager
+  3. ros2 run turtle_controller_assignment turtle_spawn_client
 
 ---
 
@@ -55,11 +65,11 @@ turtle_controller_assignment/
   3. Green pen
   4. Pen off (no drawing)
   5. Blue pen (resumes drawing)
-- **Usage:**
-  ```bash
-  ros2 run turtle_controller_assignment pen_control_client
-  ```
-
+- **Required Services:**
+  - `/turtle1/set_pen` (turtlesim/srv/SetPen)
+- **Launch Order:**
+  1. ros2 run turtlesim turtlesim_node
+  2. ros2 run turtle_controller_assignment pen_control_client
 ---
 
 ### Turtle Name Management System
@@ -107,21 +117,14 @@ turtle_controller_assignment/
   - `/monitor_turtles` (std_srvs/Trigger)
   - `/spawn` (turtlesim/srv/Spawn)
   - `/<turtle_name>/set_pen` (turtlesim/srv/SetPen)
-- **Usage:**
-  ```bash
-  # Terminal 1 - turtlesim
-  ros2 run turtlesim turtlesim_node
-  
-  # Terminal 2 - name manager
-  ros2 run turtle_controller_assignment turtle_name_manager
-  
-  # Terminal 3 - monitor service
-  ros2 run turtle_controller_assignment turtle_monitor_service
-  
-  # Terminal 4 - auto spawner
-  ros2 run turtle_controller_assignment auto_turtle_spawner
-  ```
-- **Status:** COMPLETED AND TESTED
+
+- **Launch Order:**
+  1. ros2 run turtlesim turtlesim_node
+  2. ros2 run turtle_controller_assignment turtle_name_manager
+  3. ros2 run turtle_controller_assignment turtle_monitor_service
+  4. ros2 run turtle_controller_assignment auto_turtle_spawner
+
+
 
 ### Task 4: Closest Turtle Service Server [15%]
 - **Node Name:** `closest_turtle_service`
@@ -149,30 +152,16 @@ turtle_controller_assignment/
   - Compares all active turtles (excluding turtle1)
   - Returns turtle with minimum distance
 - **Test Client:** `closest_turtle_client` (calls service every 3 seconds)
-- **Usage:**
-  ```bash
-  # Terminal 1 - turtlesim
-  ros2 run turtlesim turtlesim_node
-  
-  # Terminal 2 - name manager
-  ros2 run turtle_controller_assignment turtle_name_manager
-  
-  # Terminal 3 - monitor service
-  ros2 run turtle_controller_assignment turtle_monitor_service
-  
-  # Terminal 4 - auto spawner (to create turtles)
-  ros2 run turtle_controller_assignment auto_turtle_spawner
-  
-  # Terminal 5 - closest turtle service
-  ros2 run turtle_controller_assignment closest_turtle_service
-  
-  # Terminal 6 - test client (optional)
-  ros2 run turtle_controller_assignment closest_turtle_client
-  
-  # Or call manually:
-  ros2 service call /find_closest_turtle custom_interfaces/srv/FindClosestTurtle
-  ```
-- **Status:** COMPLETED AND TESTED
+- **Required Services:**
+  - `/find_closest_turtle` server (this node)
+  - Prerequisites: `/monitor_turtles` (std_srvs/Trigger) and pose topics discovered by monitor
+- **Launch Order:**
+  1. ros2 run turtlesim turtlesim_node
+  2. ros2 run turtle_controller_assignment turtle_name_manager
+  3. ros2 run turtle_controller_assignment turtle_monitor_service
+  4. ros2 run turtle_controller_assignment auto_turtle_spawner
+  5. ros2 run turtle_controller_assignment closest_turtle_service
+  6. ros2 run turtle_controller_assignment closest_turtle_client
 
 ### Task 5: Turtle Collection Action Server [30%]
 - **Node Name:** `turtle_collection_server`
@@ -198,30 +187,14 @@ turtle_controller_assignment/
   - `/turtle1/pose` (turtlesim/msg/Pose)
   - `/<turtle>/pose` for other turtles
   - `/turtle1/cmd_vel` (geometry_msgs/msg/Twist)
-- **Usage:**
-  ```bash
-  # Terminal 1 - turtlesim
-  ros2 run turtlesim turtlesim_node
-
-  # Terminal 2 - name manager
-  ros2 run turtle_controller_assignment turtle_name_manager
-
-  # Terminal 3 - monitor service
-  ros2 run turtle_controller_assignment turtle_monitor_service
-
-  # Terminal 4 - auto spawner (wait until 10 bots)
-  ros2 run turtle_controller_assignment auto_turtle_spawner
-
-  # Terminal 5 - closest turtle service
-  ros2 run turtle_controller_assignment closest_turtle_service
-
-  # Terminal 6 - collection action server
-  ros2 run turtle_controller_assignment turtle_collection_server
-
-  # Terminal 7 - action client
-  ros2 run turtle_controller_assignment turtle_collection_client
-  ```
-
+- **Launch Order:**
+  1. ros2 run turtlesim turtlesim_node
+  2. ros2 run turtle_controller_assignment turtle_name_manager
+  3. ros2 run turtle_controller_assignment turtle_monitor_service
+  4. ros2 run turtle_controller_assignment closest_turtle_service
+  5. ros2 run turtle_controller_assignment turtle_collection_server
+  6. ros2 run turtle_controller_assignment auto_turtle_spawner
+  7. ros2 run turtle_controller_assignment turtle_collection_client
 ### Task 6: Action Client [10%]
 - **Status:** Implemented
 - **Node Name:** `turtle_collection_client`
@@ -232,116 +205,44 @@ turtle_controller_assignment/
   - Real-time cancellation rule: cancels the current goal if bots left to collect ≥ 10 at any time during the action.
   - After cancel: logs failure, server resets simulation, client becomes ready for the next collection.
 - **Verification of real-time cancellation:**
-  - For testing only, we temporarily kept the spawner enabled during the goal and accelerated the spawn interval to 0.5s. This allowed bots to exceed the threshold during an active goal. The client then logged: `Bots left to collect: 10` and `Canceling goal: active bots=10 (>=10)`, followed by `❌ Collection failed`.
-  - The temporary test changes have been reverted: server again disables the spawner at goal start, and the spawner interval is 5 seconds per assignment.
-- **Usage:**
-  ```bash
-  ros2 run turtle_controller_assignment turtle_collection_client
-  ```
-
+  - Use the parameterized launch to adjust the spawner interval. To quickly exceed the bot threshold and observe client-side cancellation, run:
+    `ros2 launch turtle_controller_assignment assignment_launch.py spawn_interval:=2.0`
+  - To restore normal operation, launch without the parameter (default 5.0s).
+- **Required Services:**
+  - `/collect_turtles` action server (`turtle_collection_server`)
+  - `/find_closest_turtle` service (for server’s target selection)
+- **Launch Order:**
+  1. ros2 run turtlesim turtlesim_node
+  2. ros2 run turtle_controller_assignment turtle_name_manager
+  3. ros2 run turtle_controller_assignment turtle_monitor_service
+  4. ros2 run turtle_controller_assignment closest_turtle_service
+  5. ros2 run turtle_controller_assignment turtle_collection_server
+  6. ros2 run turtle_controller_assignment auto_turtle_spawner
+  7. ros2 run turtle_controller_assignment turtle_collection_client
 ### Task 7: Launch File [5%]
 - **Status:** Implemented
 - **File Name:** `assignment_launch.py`
 - **Description:** Single parameterized launch that starts turtlesim, services, action server, spawner, and client in strict event-driven order (each waits for prerequisites). Supports configurable spawn interval.
-- **Usage:**
-  ```bash
-  # Default spawn interval (5.0s)
-  ros2 launch turtle_controller_assignment assignment_launch.py
-
-  # Custom spawn interval (e.g., 2.0s)
-  ros2 launch turtle_controller_assignment assignment_launch.py spawn_interval:=2.0
-  ```
+- **Launch Order:**
+  1. Default: `ros2 launch turtle_controller_assignment assignment_launch.py`
+  2. Custom interval: `ros2 launch turtle_controller_assignment assignment_launch.py spawn_interval:=2.0`
 
 ---
 
-## Architecture Overview
-
-### Centralized Name Management
-```
-┌──────────────────┐    ┌──────────────────────┐    ┌──────────────┐
-│  Turtle Spawn    │ →  │  Turtle Name Manager │ →  │  turtlesim   │
-│  Client (Task 1) │    │  (Service Server)    │    │   Node       │
-└──────────────────┘    └──────────────────────┘    └──────────────┘
-           │
-           ▼
-Generates unique names:
-turtle_1, turtle_2, turtle_3...
-```
-
----
-
-## Current Progress
-- Package structure created  
-- Centralized Turtle Name Manager implemented  
-- Task 1 completed with unique name generation  
-- Task 2 completed - Pen Control Client implemented and tested  
-- Task 3 completed - Auto Turtle Spawner with monitoring system  
-- Task 4 completed - Closest Turtle Service Server implemented and tested  
-- Remaining tasks pending implementation  
-
----
-
-## Building and Running
-
-### 1. Build the package
+## Build the package
 ```bash
 cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
 colcon build --packages-select turtle_controller_assignment
 source install/setup.bash
 ```
-
-### 2. Test Task 1 (Spawn Client with Name Management)
-**Terminal 1 – Start turtlesim:**
-```bash
-ros2 run turtlesim turtlesim_node
-```
-
-**Terminal 2 – Start name manager:**
-```bash
-ros2 run turtle_controller_assignment turtle_name_manager
-```
-
-**Terminal 3 – Run spawn client (multiple times):**
-```bash
-ros2 run turtle_controller_assignment turtle_spawn_client
-```
-
-### 3. Test Task 2 (Pen Control Client)
-**Terminal 1 – Start turtlesim:**
-```bash
-ros2 run turtlesim turtlesim_node
-```
-
-**Terminal 2 – Run Pen Control Client:**
-```bash
-ros2 run turtle_controller_assignment pen_control_client
-```
-
-**Expected Output:**
-- Turtle moves in various paths with different pen colors and widths.  
-- Pen turns off temporarily (no drawing), then resumes with new color.  
-- Console prints step-by-step demo messages.
-
----
 
 ## Dependencies
 - rclpy  
 - geometry_msgs  
 - turtlesim  
 - std_srvs  
-- custom interfaces (to be created for later tasks)
+- custom_interfaces (srv: FindClosestTurtle; action: MoveTurtle)
 
 ---
 
-## Next Implementation Steps
-1. ~~Implement Task 1 with name management~~  
-2. ~~Implement Task 2 (pen control client)~~  
-3. ~~Implement Task 3 (auto-spawner with monitoring system)~~  
-4. ~~Implement Task 4 (closest turtle service)~~  
-5. Implement Task 5 (collection action server)  
-6. Implement Task 6 (action client with cancellation)  
-7. Create Task 7 (comprehensive launch file)
-
----
-
-*Last updated: Task 4 completed — Closest Turtle Service Server implemented and tested*
