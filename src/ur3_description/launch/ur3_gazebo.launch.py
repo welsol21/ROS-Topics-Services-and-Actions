@@ -37,10 +37,11 @@ def generate_launch_description():
         parameters=[{"robot_description": robot_description}],
     )
 
-    # Gazebo Harmonic (gz-sim8)
+    # Gazebo Garden (ign-gazebo6) - compatible with ros-humble-gz-ros2-control
     gz_sim = ExecuteProcess(
-        cmd=["gz", "sim", "-r", "-v", "4", "empty.sdf"],
+        cmd=["ign", "gazebo", "-r", "-v", "4", "empty.sdf"],
         output="screen",
+        additional_env={"GZ_SIM_SYSTEM_PLUGIN_PATH": "/opt/ros/humble/lib"},
     )
 
     # Bridge for /clock and /world/empty/set_pose service
@@ -54,7 +55,7 @@ def generate_launch_description():
         parameters=[{"config_file": gz_bridge_params}],
     )
 
-    # Spawn table via gz service command
+    # Spawn table via ign service command (Garden)
     spawn_table = TimerAction(
         period=3.0,
         actions=[
@@ -63,7 +64,7 @@ def generate_launch_description():
                     "bash", "-c",
                     "source /home/vlad/ros2_ws/install/setup.bash && "
                     "TABLE_SDF=$(ros2 pkg prefix ur3_description)/share/ur3_description/models/table.sdf && "
-                    "gz service -s /world/empty/create --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean --timeout 5000 "
+                    "ign service -s /world/empty/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 30000 "
                     "--req \"sdf_filename: \\\"$TABLE_SDF\\\", name: \\\"table\\\"\""
                 ],
                 output="screen",
@@ -71,7 +72,7 @@ def generate_launch_description():
         ],
     )
 
-    # Spawn cube via gz service command
+    # Spawn cube via ign service command (Garden)
     spawn_cube = TimerAction(
         period=4.0,
         actions=[
@@ -80,7 +81,7 @@ def generate_launch_description():
                     "bash", "-c",
                     "source /home/vlad/ros2_ws/install/setup.bash && "
                     "CUBE_SDF=$(ros2 pkg prefix ur3_description)/share/ur3_description/models/cube.sdf && "
-                    "gz service -s /world/empty/create --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean --timeout 5000 "
+                    "ign service -s /world/empty/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 30000 "
                     "--req \"sdf_filename: \\\"$CUBE_SDF\\\", name: \\\"cube\\\", pose: {position: {y: 0.5, z: 1.0}}\""
                 ],
                 output="screen",
@@ -88,7 +89,7 @@ def generate_launch_description():
         ],
     )
 
-    # Spawn UR3 robot via robot_description topic
+    # Spawn UR3 robot via robot_description topic (Garden)
     spawn_robot = TimerAction(
         period=5.0,
         actions=[
@@ -97,7 +98,7 @@ def generate_launch_description():
                     "bash", "-c",
                     "source /home/vlad/ros2_ws/install/setup.bash && "
                     "ros2 topic echo --once /robot_description --field data | head -n -1 > /tmp/ur3_robot.urdf && "
-                    "gz service -s /world/empty/create --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean --timeout 5000 "
+                    "ign service -s /world/empty/create --reqtype ignition.msgs.EntityFactory --reptype ignition.msgs.Boolean --timeout 30000 "
                     "--req \"sdf_filename: \\\"/tmp/ur3_robot.urdf\\\", name: \\\"ur3\\\", pose: {position: {z: 1.0}}\""
                 ],
                 output="screen",
