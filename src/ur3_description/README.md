@@ -8,21 +8,70 @@ This package contains the UR3 robot description, controllers, simulation environ
 ### Task 1: UR3 Description [10%]
 **Status**: Complete
 
-Completed:
-- Created CMake package `ur3_description`
-- Copied Assignment2.zip contents into package
+Implementation Details:
+- Created CMake package `ur3_description` using `ros2 pkg create --build-type ament_cmake ur3_description`
+- Copied Assignment2.zip contents into package directory
 - Added install directives to CMakeLists.txt
-- Fixed URDF configuration for RViz visualization
-- Robot successfully displays in RViz via `ur3_rviz.launch.py`
-- Added joint state broadcaster controller
-- Added forward command controller
-- Added joint trajectory controller
-- Configured controller limits (±2π for all joints except elbow: ±π)
-- Created Gazebo launch file with controllers
-- Spawned table at (0, 0, 0)
-- Spawned cube at (0, 0.5, 1)
-- Spawned robot at (0, 0, 1)
-- Verified controller functionality via terminal commands
+- Fixed URDF configuration:
+  - Corrected launch file `ur3_rviz.launch.py` (lines 10-12) to use `ur3.urdf.xacro` instead of `ur3_description.urdf.xacro` - the latter file didn't exist, causing robot not to appear in RViz with "Frame [base_link] does not exist" error
+  - Fixed robot name attribute in `ur3.urdf.xacro` (line 2) from `$(arg name)` to hardcoded `ur3` - xacro arguments must be defined before use, otherwise causes "Undefined substitution argument name" error
+- Added ros2_control configuration in `ur3.ros2_control.xacro`:
+  - Defined hardware interface with gz_ros2_control/GazeboSimSystem plugin (line 8)
+  - Added all 6 joints with command and state interfaces (lines 11-63)
+  - Configured joint limits: ±2π for all joints except elbow joint (±π) in `ur3_controllers.yaml`
+- Created Gazebo simulation environment in `ur3_gazebo.launch.py`:
+  - Launch file with robot_state_publisher, gz_server, and ros_gz_bridge
+  - Spawned table model at coordinates (0, 0, 0) using ros_gz_sim create node (lines 62-72)
+  - Spawned cube model at coordinates (0, 0.5, 1) using ros_gz_sim create node (lines 79-89)
+  - Spawned UR3 robot model at coordinates (0, 0, 1) using ros_gz_sim create node (lines 96-106)
+  - Activated joint_state_broadcaster (line 115) and forward_position_controller (line 130) via spawner nodes
+- Verified controller functionality through terminal commands
+
+RViz Visualization:
+The image below shows the UR3 robot visualization in RViz with the joint state publisher GUI. The interface allows for interactive manipulation of the robot's joints to verify kinematic behavior.
+![RViz and rqt](RViz_rqt.png)
+
+Gazebo Simulation:
+The image below shows the UR3 robot in the Gazebo simulation environment along with the table and cube objects positioned according to the assignment requirements.
+![Gazebo Simulation](Gazebo.png)
+
+System Architecture Diagram:
+```
+        +-----------------+
+        |   RViz/GUI      |
+        +--------+--------+
+                 |
+        +--------v--------+
+        | robot_state_pub |
+        +--------+--------+
+                 |
+        +--------v--------+     +--------------------+
+        |   URDF Model    |<----+ ros2_control Plugin |
+        +--------+--------+     +---------+----------+
+                 |                          |
+        +--------v--------+     +---------v----------+
+        |   Gazebo Sim    |<----+ Controller Manager |
+        +-----------------+     +--------------------+
+```
+
+Component Positions in Gazebo:
+```
+Z-axis (height)
+^
+|    Robot (0,0,1)
+|     o
+|    /|\
+|   / | \
+|  o  o  o
+|
+|  Cube (0,0.5,1)
+|    []
+|
+|  Table (0,0,0)
+|  _________
+|____________________> Y-axis
+(0,0,0)    (0,0.5,0)
+```
 
 ### Task 2: UR3 Manipulation [20%]
 **Status**: Not Started
