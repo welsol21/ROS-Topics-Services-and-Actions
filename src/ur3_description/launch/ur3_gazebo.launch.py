@@ -37,7 +37,7 @@ def generate_launch_description():
         parameters=[{"robot_description": robot_description}],
     )
 
-    # Gazebo (using direct gz sim command)
+    # Gazebo Harmonic (gz-sim8)
     gz_sim = ExecuteProcess(
         cmd=["gz", "sim", "-r", "-v", "4", "empty.sdf"],
         output="screen",
@@ -54,57 +54,60 @@ def generate_launch_description():
         parameters=[{"config_file": gz_bridge_params}],
     )
 
-    # Spawn table
-    table_sdf = PathJoinSubstitution(
-        [pkg_share, "models", "table.sdf"]
-    )
-    spawn_table = Node(
-        package="ros_gz_sim",
-        executable="create",
-        arguments=[
-            "-name", "table",
-            "-file", table_sdf,
-            "-x", "0.0",
-            "-y", "0.0",
-            "-z", "0.0",
+    # Spawn table via gz service command
+    spawn_table = TimerAction(
+        period=3.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    "bash", "-c",
+                    "source /home/vlad/ros2_ws/install/setup.bash && "
+                    "TABLE_SDF=$(ros2 pkg prefix ur3_description)/share/ur3_description/models/table.sdf && "
+                    "gz service -s /world/empty/create --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean --timeout 5000 "
+                    "--req \"sdf_filename: \\\"$TABLE_SDF\\\", name: \\\"table\\\"\""
+                ],
+                output="screen",
+            )
         ],
-        output="screen",
     )
 
-    # Spawn cube
-    cube_sdf = PathJoinSubstitution(
-        [pkg_share, "models", "cube.sdf"]
-    )
-    spawn_cube = Node(
-        package="ros_gz_sim",
-        executable="create",
-        arguments=[
-            "-name", "cube",
-            "-file", cube_sdf,
-            "-x", "0.0",
-            "-y", "0.5",
-            "-z", "1.0",
+    # Spawn cube via gz service command
+    spawn_cube = TimerAction(
+        period=4.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    "bash", "-c",
+                    "source /home/vlad/ros2_ws/install/setup.bash && "
+                    "CUBE_SDF=$(ros2 pkg prefix ur3_description)/share/ur3_description/models/cube.sdf && "
+                    "gz service -s /world/empty/create --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean --timeout 5000 "
+                    "--req \"sdf_filename: \\\"$CUBE_SDF\\\", name: \\\"cube\\\", pose: {position: {y: 0.5, z: 1.0}}\""
+                ],
+                output="screen",
+            )
         ],
-        output="screen",
     )
 
-    # Spawn UR3 robot at (0,0,1) using robot_description topic
-    spawn_robot = Node(
-        package="ros_gz_sim",
-        executable="create",
-        arguments=[
-            "-name", "ur3",
-            "-topic", "robot_description",
-            "-x", "0.0",
-            "-y", "0.0",
-            "-z", "1.0",
+    # Spawn UR3 robot via robot_description topic
+    spawn_robot = TimerAction(
+        period=5.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    "bash", "-c",
+                    "source /home/vlad/ros2_ws/install/setup.bash && "
+                    "ros2 topic echo --once /robot_description --field data | head -n -1 > /tmp/ur3_robot.urdf && "
+                    "gz service -s /world/empty/create --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean --timeout 5000 "
+                    "--req \"sdf_filename: \\\"/tmp/ur3_robot.urdf\\\", name: \\\"ur3\\\", pose: {position: {z: 1.0}}\""
+                ],
+                output="screen",
+            )
         ],
-        output="screen",
     )
 
     # Spawners for controllers (joint state broadcaster + forward position controller)
     jsb_spawner = TimerAction(
-        period=5.0,
+        period=8.0,
         actions=[
             Node(
                 package="controller_manager",
@@ -120,7 +123,7 @@ def generate_launch_description():
     )
 
     forward_pos_spawner = TimerAction(
-        period=7.0,
+        period=10.0,
         actions=[
             Node(
                 package="controller_manager",
