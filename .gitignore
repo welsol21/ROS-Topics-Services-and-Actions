@@ -75,5 +75,9 @@ COMP9069_Assign1_2025.pdf
 *.pdf
 *.docx
 
-# Ignore all test directories in the workspace
-# **/test/**
+# Ignore all test directories in packages
+**/test/**
+**/tests/**
+
+# Test reports
+*_TEST_REPORT.md

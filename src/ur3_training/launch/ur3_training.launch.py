@@ -45,6 +45,16 @@ def generate_launch_description():
         parameters=[{"robot_description": robot_description}],
     )
 
+    # Controller Manager Node
+    controller_manager = Node(
+        package="controller_manager",
+        executable="ros2_control_node",
+        parameters=[
+            PathJoinSubstitution([FindPackageShare("ur3_description"), "config", "ur3_controllers.yaml"]),
+        ],
+        output="screen",
+    )
+
     # Gazebo Garden (ign-gazebo6) - compatible with ros-humble-gz-ros2-control
     gz_sim = ExecuteProcess(
         cmd=["ign", "gazebo", "-r", "-v", "4", "empty.sdf"],
@@ -153,6 +163,7 @@ def generate_launch_description():
     ld.add_action(gz_sim)
     ld.add_action(gazebo_bridge)
     ld.add_action(robot_state_publisher)
+    ld.add_action(controller_manager)
     ld.add_action(spawn_table)
     ld.add_action(spawn_cube)
     ld.add_action(spawn_robot)
