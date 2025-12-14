@@ -88,30 +88,50 @@ ros2 launch ur3_training ur3_training.launch.py controller:=forward_position_con
 ros2 launch ur3_training ur3_training.launch.py controller:=joint_trajectory_controller
 ```
 
-### Method 2: Manual Controller Switching
+### Method 2: Manual Controller Switching During Runtime
 
-If simulation is already running:
+If simulation is already running, you can switch controllers without restarting:
 
-```bash
-# Switch to forward position controller
-ros2 control switch_controllers --deactivate joint_trajectory_controller --activate forward_position_controller
+1. **Open a new terminal window**
 
-# Switch to joint trajectory controller
-ros2 control switch_controllers --deactivate forward_position_controller --activate joint_trajectory_controller
-```
+2. **Source the ROS 2 environment**:
+   ```bash
+   source /opt/ros/humble/setup.bash
+   source ~/ros2_ws/install/setup.bash
+   ```
+
+3. **Switch to forward position controller**:
+   ```bash
+   ros2 control switch_controllers --deactivate joint_trajectory_controller --activate forward_position_controller
+   ```
+
+4. **Or switch to joint trajectory controller**:
+   ```bash
+   ros2 control switch_controllers --deactivate forward_position_controller --activate joint_trajectory_controller
+   ```
 
 ### Method 3: Load and Activate Controllers Manually
 
 If controllers are not loaded:
 
-```bash
-# Load controllers (they will be inactive)
-ros2 control load_controller forward_position_controller
-ros2 control load_controller joint_trajectory_controller
+1. **Open a new terminal window**
 
-# Activate one controller and deactivate the other
-ros2 control switch_controllers --deactivate joint_trajectory_controller --activate forward_position_controller
-```
+2. **Source the ROS 2 environment**:
+   ```bash
+   source /opt/ros/humble/setup.bash
+   source ~/ros2_ws/install/setup.bash
+   ```
+
+3. **Load controllers (they will be inactive)**:
+   ```bash
+   ros2 control load_controller forward_position_controller
+   ros2 control load_controller joint_trajectory_controller
+   ```
+
+4. **Activate one controller and deactivate the other**:
+   ```bash
+   ros2 control switch_controllers --deactivate joint_trajectory_controller --activate forward_position_controller
+   ```
 
 ## Using the Control Nodes
 
