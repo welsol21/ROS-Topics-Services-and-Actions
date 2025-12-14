@@ -100,6 +100,19 @@ ros2 control switch_controllers --deactivate joint_trajectory_controller --activ
 ros2 control switch_controllers --deactivate forward_position_controller --activate joint_trajectory_controller
 ```
 
+### Method 3: Load and Activate Controllers Manually
+
+If controllers are not loaded:
+
+```bash
+# Load controllers (they will be inactive)
+ros2 control load_controller forward_position_controller
+ros2 control load_controller joint_trajectory_controller
+
+# Activate one controller and deactivate the other
+ros2 control switch_controllers --deactivate joint_trajectory_controller --activate forward_position_controller
+```
+
 ## Using the Control Nodes
 
 Both nodes operate identically:
@@ -127,7 +140,7 @@ Both nodes operate identically:
 ## Troubleshooting
 
 1. **Controller conflicts**: Only one controller active at once
-2. **"Controller not found"**: Ensure simulation is running
+2. **"Controller not found"**: Ensure simulation is running and controllers are loaded
 3. **No response to inputs**: Check controller activation status
 4. **TF errors**: Verify robot_state_publisher is running
 

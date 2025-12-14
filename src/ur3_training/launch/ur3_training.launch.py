@@ -141,7 +141,42 @@ def generate_launch_description():
         ],
     )
 
-    # Conditional controller spawner
+    # Load controllers without activating them
+    forward_position_loader = TimerAction(
+        period=9.0,
+        actions=[
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=[
+                    "forward_position_controller",
+                    "--controller-manager",
+                    "/controller_manager",
+                    "--inactive",
+                ],
+                output="screen",
+            )
+        ],
+    )
+
+    joint_trajectory_loader = TimerAction(
+        period=9.5,
+        actions=[
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=[
+                    "joint_trajectory_controller",
+                    "--controller-manager",
+                    "/controller_manager",
+                    "--inactive",
+                ],
+                output="screen",
+            )
+        ],
+    )
+
+    # Conditional controller spawner - activate the selected controller
     controller_spawner = TimerAction(
         period=10.0,
         actions=[
@@ -168,6 +203,8 @@ def generate_launch_description():
     ld.add_action(spawn_cube)
     ld.add_action(spawn_robot)
     ld.add_action(jsb_spawner)
+    ld.add_action(forward_position_loader)
+    ld.add_action(joint_trajectory_loader)
     ld.add_action(controller_spawner)
 
     return ld
