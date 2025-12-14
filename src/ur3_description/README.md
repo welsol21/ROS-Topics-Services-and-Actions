@@ -3,9 +3,7 @@
 ## Package Overview
 This package contains the UR3 robot description, controllers, simulation environment, and training setup for COMP9069 Robotics & Autonomous Systems Assignment 2.
 
-## Tasks Completion Status
-
-### Task 1: UR3 Description [10%]
+## Task 1: UR3 Description [10%]
 **Status**: Complete
 
 Implementation Details:
@@ -73,36 +71,11 @@ Z-axis (height)
 (0,0,0)    (0,0.5,0)
 ```
 
-### Task 2: UR3 Manipulation [20%]
-**Status**: Not Started
-
-To Do:
-- Create package `ur3_training`
-- Create node for interactive joint movement (forward command controller)
-- Create node for interactive joint movement (joint trajectory controller)
-- Implement user input loop for joint selection and movement
-- Monitor movement completion
-- Print final joint position, error, and end effector pose
-
-### Task 3: UR3 Training [70%]
-**Status**: Not Started
-
-To Do:
-- Create custom Gymnasium environment
-- Implement action space (27 discrete actions for 3 joints)
-- Implement observation space (joint positions, end effector xy, cube xy)
-- Normalize observation space
-- Implement reward function (-1 per step, +100 for goal)
-- Implement episode termination/truncation logic
-- Implement environment reset with random cube positioning
-- Configure Gazebo bridge for `/world/empty/set_pose` service
-- Train robot with Q-learning
-- Train robot with DQN
-
 ## Build Instructions
 
 ```bash
 cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
 colcon build --packages-select ur3_description
 source install/setup.bash
 ```
@@ -163,6 +136,9 @@ ur3_description/
 Fixed issue where robot was not visible in RViz:
 - Changed launch file to use `ur3.urdf.xacro` instead of `ur3_description.urdf.xacro`
 - Fixed robot name attribute in URDF from `$(arg name)` to `ur3` (resolved xacro argument ordering issue)
+
+### Known Issues
+For information about known issues with the UR3 training package (Task 2), please see the separate README.md in the ur3_training package or the ASSIGNMENT2_SUMMARY_REPORT.md file.
 
 ## Author
 Vlad - COMP9069 MSc AI
