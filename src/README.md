@@ -96,7 +96,7 @@ ros2 launch ur3_training ur3_training.launch.py controller:=joint_trajectory_con
   ./install/ur3_training/bin/joint_trajectory_control
   ```
 
-## Task 3: UR3 Training [70%] - In Progress 🔄
+## Task 3: UR3 Training [70%] - In Progress ✅
 
 ### Objectives Achieved:
 - Created custom Gymnasium environment `UR3Env`
